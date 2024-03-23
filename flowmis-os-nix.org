@@ -9,6 +9,9 @@ rsync -av /home/flowmis/flowmis-os/flowmis/.config/emacs/ /home/flowmis/.config/
 echo done
 #+end_src
 :END:
+
+git clone https://github.com/flowmis/flowminix.git && mv flowminix .config && sudo nixos-rebuild switch --flake ~/.config/
+
 * TODO Vorbereitung für Hardware Installation
 - [ ] Fertige Konfigurationsdateien in VM erstellen
 - [ ] Diese Repo so anpassen, dass ich in nixos nut git installieren muss diese repo clonen, die gewünschten Module aktivieren und mit einem Befehl dann alles einrichte
