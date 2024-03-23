@@ -25,7 +25,6 @@
   # Bootloader-Konfiguration
   boot.loader.grub = {
     enable = true;
-    version = 2;
     device = "nodev";
     useOSProber = true;
   };
@@ -46,12 +45,9 @@
   };
 
   # Auto-Login für flowmis
-  services.xserver.displayManager.sddm = {
+  services.xserver.displayManager.autoLogin = {
     enable = true;
-    autoLogin = {
-      enable = true;
-      user = "flowmis";
-    };
+    user = "flowmis";
   };
 
   services.xserver = {
@@ -79,4 +75,5 @@
     wget
     git
   ];
+system.stateVersion = "23.11"; # Ersetze durch deine tatsächliche Installationsversion
 }

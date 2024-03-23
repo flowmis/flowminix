@@ -86,7 +86,6 @@ _Besonderheiten:_
   # Bootloader-Konfiguration
   boot.loader.grub = {
     enable = true;
-    version = 2;
     device = "nodev";
     useOSProber = true;
   };
@@ -107,12 +106,9 @@ _Besonderheiten:_
   };
 
   # Auto-Login für flowmis
-  services.xserver.displayManager.sddm = {
+  services.xserver.displayManager.autoLogin = {
     enable = true;
-    autoLogin = {
-      enable = true;
-      user = "flowmis";
-    };
+    user = "flowmis";
   };
 
   services.xserver = {
@@ -140,6 +136,7 @@ _Besonderheiten:_
     wget
     git
   ];
+system.stateVersion = "23.11"; # Ersetze durch deine tatsächliche Installationsversion
 }
 #+end_src
 * Flakes
@@ -149,15 +146,13 @@ _Besonderheiten:_
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11";
-    // flake-utils wird entfernt, da es nicht benötigt wird.
   };
 
   outputs = { self, nixpkgs, ... }: {
-    nixosConfigurations.meinSystem = nixpkgs.lib.nixosSystem {
+    nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
         ./configuration.nix
-        // Hier könnten weitere Module hinzugefügt werden, falls nötig.
       ];
     };
   };
