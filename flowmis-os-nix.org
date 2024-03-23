@@ -1,0 +1,175 @@
+:Einstellungen:
+#+TITLE: flowmis-os-nix
+#+STARTUP: folded shrink
+#+begin_src shell
+rsync -av /home/flowmis/flowmis-os/flowmis/.config/emacs/ /home/flowmis/.config/emacs/
+# rsync -av /home/flowmis/flowmis-os/flowmis/.config/qtile/ /home/flowmis/.config/qtile/
+# rsync -av /home/flowmis/flowmis-os/flowmis/ /home/flowmis/
+# sudo cp /etc/xdg/picom.conf /home/flowmis/.config/picom/picom.conf #die Standardconfig falls ich lokal was ändern will aber eigentlich eher unnötig!
+echo done
+#+end_src
+:END:
+* TODO Vorbereitung für Hardware Installation
+- [ ] Fertige Konfigurationsdateien in VM erstellen
+- [ ] Diese Repo so anpassen, dass ich in nixos nut git installieren muss diese repo clonen, die gewünschten Module aktivieren und mit einem Befehl dann alles einrichte
+* Nix
+** NixOS und der Nix Paketmanager 
+_Vorteile:_
+- Reliable & Reproducible 
+  - Erlaubt eine sehr einfache Wiederherstellung meines Systems 
+  - Installation und Upgrade eines Pakets hat keinerlei Einflüsse auf andere Pakete - keine Problemen zwischen Paketen! 
+  - Ein Programm liegt mit Hash in /nix/store -> Abhängigkeiten kommen mit den Paketen mit -> eine Änderung wird über den Hash sichtbar -> solange die Hashs unverändert sind und alle Abhängigkeiten direkt dort vorliegen, funktioniert es stabil weiter wie gehabt
+  - Änderungen werden gespeichert und können einfach über den Bootmanager rückgängig gemacht werden -> zurück zum vorhergehenden Hash bei dem es funktioniert hat
+- Declarative 
+  - Das komplette System ist über eine/mehrere Konfigurationsdatei beschreibbar und änderbar -> ideal um mein System auf unterschiedlichen Geräten und Servern zu nutzen
+_Besonderheiten:_
+  - Im Ordner /etc/nixos liegen die Konfigurationsdateien (configuration.nix + hardware-configuration.nix) - die hardware-configuration.nix wird automatisch bei der Installation von NixOS erstellt und da ich hier ja in der Regel nichts ändere, kann und sollte ich diese Datei unverändert lassen!
+  - Nach der Installation ist nur nano installiert, also sollte ich mit diesem in /etc/nixos/configuration.nix rein und meine Anpassungen vornehmen (Beispielsweise vim installieren)
+  - Pakete findet man unter: https://mynixos.com/
+  - channels (Standard um Versionen der Pakete zu managen) -> flakes (Vorteil, dass eine flakes.log erstellt wird die alle Versionen etc. beinhaltet und mit git gemanaged zur Zeitmaschine wird - wobei so weit wie gewünscht zurück und vor gegangen werden kann, weshalb flakes den nixos standard mit channels nochmal verbessert!) -> weiteres siehe flakes!
+  - um flakes zu aktivieren muss ich in der configuration.nix am Ende vor der letzten }-Klammer die folgende Option ergänzen: nix.settings.experimental-features = [ "nic-command" "flakes"];
+** Wichtige Befehle
+|-------------------------------------+---------------------------------------------------------------------------------------------------------------|
+| Befehl                              | Beschreibung                                                                                                  |
+|-------------------------------------+---------------------------------------------------------------------------------------------------------------|
+| sudo nixos-rebuild switch           | Wendet die Konfigurationsänderungen an und wechselt zu einem neuen Systemzustand.                             |
+| nixos-rebuild test                  | Testet die Konfigurationsänderungen, ohne sie dauerhaft anzuwenden.                                           |
+| nixos-rebuild build                 | Baut die Systemkonfiguration, ohne sie anzuwenden oder zu aktivieren.                                         |
+| nixos-option <Option>               | Zeigt Informationen über eine spezifische NixOS-Option an.                                                    |
+| nix-env -i <Paket>                  | Installiert ein Paket im Benutzerprofil.                                                                      |
+| nix-env -e <Paket>                  | Entfernt ein Paket aus dem Benutzerprofil.                                                                    |
+| nix-channel --update                | Aktualisiert die Nix-Kanäle, um die neuesten Paketversionen zu erhalten.                                      |
+| nix-store --gc                      | Führt den Garbage Collector aus, um nicht verwendeten Speicherplatz freizugeben.                              |
+| nixos-generate-config               | Generiert eine neue Konfigurationsdatei für /etc/nixos/hardware-configuration.nix basierend auf der Hardware. |
+| nix-shell '<nixpkgs>' -A <Paket>    | Startet eine interaktive Shell, die für die Entwicklung mit einem spezifischen Paket vorbereitet ist.         |
+|-------------------------------------+---------------------------------------------------------------------------------------------------------------|
+| sudo nix flake update               | Update der Pakete auf neueste Version                                                                         |
+| sudo nixos-rebuild switch --flake . | System updaten auf die bereits mit dem Befehl zuvor aktualisierte flake.log                                   |
+|-------------------------------------+---------------------------------------------------------------------------------------------------------------|
+
+** Download und Install [[https://nixos.org/][hier]]
+- VM sollte haben: 8GB RAM, 4 Kerne und min. 100G an Speicher um alles richtig kompilieren, updaten und aufsetzen zu können!
+- grafische Installationsvariante hilft - wenn ich nixos habe kann ich auch leicht eine eigene .iso erstellen mit meiner fertigen .config - siehe hier
+- Vor dem Start unter Einstellungen der VM System das Zeigergerät auf USB-Tablet stellen, da Mauszeiger in der GUI sonst eventuell nicht richtig funktioniert! (3D-Beschleunigung nicht aktivieren, da es sonst nicht richtig bootet)
+- Bei Desktop qtile verwende und den Rest über die tty einrichten
+- Bei 46% wird es eine Weile dauern bis es weiter geht!
+
+** Einrichten (siehe auch - [[https://www.youtube.com/watch?v=a67Sv4Mbxmc][hier]])
+- ~mkdir .config~ in =/home/flowmis=, oder github repo direkt an diese Stelle mit diesem Namen clonen!
+
+* Konfiguration
+#+begin_src nix :tangle configuration.nix
+{ config, pkgs, ... }:
+
+{
+  imports =
+    [
+      ./hardware-configuration.nix
+    ];
+
+  # Lokalisierung
+  i18n.defaultLocale = "de_DE.UTF-8";
+  console = {
+    font = "Lat2-Terminus16";
+    keyMap = "de";
+  };
+  i18n.supportedLocales = [ "en_US.UTF-8/UTF-8" "de_DE.UTF-8/UTF-8" ];
+
+  # Zeitzone
+  time.timeZone = "Europe/Berlin";
+
+  # Netzwerkdienste
+  networking = {
+    networkmanager.enable = true;
+  };
+
+  # Bootloader-Konfiguration
+  boot.loader.grub = {
+    enable = true;
+    version = 2;
+    device = "nodev";
+    useOSProber = true;
+  };
+  boot.kernelParams = [ "console=tty1" ];
+  networking.hostName = "nixos"; 
+
+  # Benutzerkonfiguration
+  users.users.flowmis = {
+    isNormalUser = true;
+    extraGroups = [ "wheel" "networkmanager" ]; # Zugriff auf Netzwerkverwaltung
+    packages = with pkgs; [
+      brave
+      emacs
+      qtile
+      alacritty
+      fish
+    ];
+  };
+
+  # Auto-Login für flowmis
+  services.xserver.displayManager.sddm = {
+    enable = true;
+    autoLogin = {
+      enable = true;
+      user = "flowmis";
+    };
+  };
+
+  services.xserver = {
+    enable = true;
+    layout = "de";
+    windowManager.qtile.enable = true;
+  };
+
+  # Unfreie Pakete erlauben
+  nixpkgs.config.allowUnfree = true;
+
+  # Experimentelle Features aktivieren
+  nix = {
+    package = pkgs.nixUnstable;
+    extraOptions = ''
+      experimental-features = nix-command flakes
+    '';
+  };
+
+  # Systemweite Pakete hinzufügen
+  environment.systemPackages = with pkgs; [
+    networkmanager
+    neovim
+    vim
+    wget
+    git
+  ];
+}
+#+end_src
+* Flakes
+#+begin_src nix :tangle flake.nix
+{
+  description = "Meine erste flake!";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11";
+    flake-utils.url = "github:numtide/flake-utils";
+  };
+
+  outputs = { self, nixpkgs, flake-utils, ... }: 
+    flake-utils.lib.eachDefaultSystem (system: 
+      let
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [];
+        };
+      in
+      {
+        nixosConfigurations.meinSystem = {
+          inherit system;
+          modules = [
+            ./configuration.nix
+            # Hier könnten weitere Module hinzugefügt werden, falls nötig.
+          ];
+        };
+      }
+    );
+}
+#+end_src
+* HomeManager - Module managen
