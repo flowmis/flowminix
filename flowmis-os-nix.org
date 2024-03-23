@@ -149,27 +149,18 @@ _Besonderheiten:_
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11";
-    flake-utils.url = "github:numtide/flake-utils";
+    // flake-utils wird entfernt, da es nicht benötigt wird.
   };
 
-  outputs = { self, nixpkgs, flake-utils, ... }: 
-    flake-utils.lib.eachDefaultSystem (system: 
-      let
-        pkgs = import nixpkgs {
-          inherit system;
-          overlays = [];
-        };
-      in
-      {
-        nixosConfigurations.meinSystem = {
-          inherit system;
-          modules = [
-            ./configuration.nix
-            # Hier könnten weitere Module hinzugefügt werden, falls nötig.
-          ];
-        };
-      }
-    );
+  outputs = { self, nixpkgs, ... }: {
+    nixosConfigurations.meinSystem = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        ./configuration.nix
+        // Hier könnten weitere Module hinzugefügt werden, falls nötig.
+      ];
+    };
+  };
 }
 #+end_src
 * HomeManager - Module managen
