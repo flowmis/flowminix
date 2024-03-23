@@ -10,7 +10,8 @@ echo done
 #+end_src
 :END:
 
-git clone https://github.com/flowmis/flowminix.git && mv flowminix .config && sudo nixos-rebuild switch --flake ~/.config/
+git clone https://github.com/flowmis/flowminix.git && mv flowminix .config && cp /etc/nixos/hardware-configuration.nix /home/flowmis/.config/
+sudo nixos-rebuild switch --flake .
 
 * TODO Vorbereitung für Hardware Installation
 - [ ] Fertige Konfigurationsdateien in VM erstellen

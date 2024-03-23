@@ -1,0 +1,1661 @@
+#+TITLE: Emacs à la Mane
+#+AUTHOR: Mane
+#+DESCRIPTION: Konfigurationsdatei für Emacs.
+* TABLE OF CONTENTS :toc:
+- [[#ausgelagerte-skripte-module][Ausgelagerte Skripte "Module"]]
+- [[#checker-flycheck-languagetool][Checker (flycheck, languagetool,...)]]
+- [[#dashboard][Dashboard]]
+- [[#denote][Denote]]
+- [[#dired][Dired]]
+- [[#erscheinungsbild][Erscheinungsbild]]
+  - [[#highlight-todo][Highlight Todo]]
+  - [[#beacon-mode][Beacon Mode]]
+  - [[#modeline][Modeline]]
+  - [[#moderner-look][Moderner Look]]
+  - [[#hide-org-blocks][Hide Org-Blocks]]
+  - [[#schrift-und-rahmen][Schrift und Rahmen]]
+  - [[#theme][Theme]]
+  - [[#transparenz][Transparenz]]
+  - [[#zooming-inout][Zooming In/Out]]
+- [[#eshell--vterm][Eshell & vterm]]
+- [[#export][Export]]
+  - [[#präsentationen-und-pdfs][Präsentationen und PDFs]]
+  - [[#html][Html]]
+  - [[#diagramme-etc][Diagramme etc.]]
+  - [[#zusatzinfo][Zusatzinfo]]
+- [[#git][Git]]
+- [[#gpt--llms][GPT & LLMs]]
+- [[#minibuffer---vertico-marginalia-consult-embark-orderless-company-complete-anything][Minibuffer - vertico, marginalia, consult, embark, orderless, company (complete anything)]]
+- [[#kalender][Kalender]]
+- [[#mail][Mail]]
+- [[#makros][Makros]]
+- [[#multieditmulitple-cursor][Multiedit/Mulitple Cursor]]
+- [[#org][Org]]
+  - [[#agenda][Agenda]]
+  - [[#blocks][Blocks]]
+  - [[#bullets][Bullets]]
+  - [[#clock-time][Clock Time]]
+  - [[#download][Download]]
+  - [[#drillflashcardslearningcard-in-emacs][Drill/Flashcards/Learningcard in Emacs]]
+  - [[#export-1][Export]]
+  - [[#keybinds][Keybinds]]
+  - [[#open-links-with-programm][Open Links with Programm]]
+  - [[#roam][Roam]]
+  - [[#minor-modes-schreibmodus--präsentationsmodus][Minor-Modes (Schreibmodus & Präsentationsmodus)]]
+  - [[#settings][Settings]]
+  - [[#table-of-contents][Table of Contents]]
+  - [[#tables][Tables]]
+  - [[#transclusion][Transclusion]]
+- [[#passwörter][Passwörter]]
+- [[#pdf-tools][PDF-Tools]]
+- [[#safe-undo-redo-yank][Safe Undo Redo Yank]]
+- [[#search-grep-ediff][Search, Grep, Ediff,...]]
+- [[#snippetsabbrev][Snippets/Abbrev]]
+- [[#which-key][Which-Key]]
+- [[#workspaces-register--bookmarks][Workspaces, Register & Bookmarks]]
+- [[#zitieren-mit-org-ref][Zitieren mit org-ref]]
+- [[#tramp][Tramp]]
+- [[#testing][TESTING]]
+
+* Ausgelagerte Skripte "Module"
+Die Teile der Konfiguration die ich wenig ändere und die ich als Skripte in Form einer .el Datei im Skriptordner ausgelagert habe kann ich hier rein laden mit dem folgenden Befehl -> so wird die Konfigurationsdatei hier nicht unnötig groß und bleibt übersichtlicher -> um etwas als script auszulagern einfach im Skript Ordner eine .el dazu erstellen und am Ende der .el ~(provide 'name-des-elisp-files)~ einfügen und hier dann auf den Ordner verweisen!
+#+begin_src elisp
+(add-to-list 'load-path "~/.config/emacs/scripts/")
+(add-to-list 'load-path "~/.config/emacs/scripts/denote")
+(require 'setup-settings-basics)  ;; The Elpaca Package Manager
+;;(require 'buffer-move)   ;; Buffer-move for better window management
+;;(require 'app-launcher) ;; Use emacs as a run launcher like rofi (experimental)
+;; (require 'org-roam) ;; Use emacs as second brain
+#+end_src
+* Checker (flycheck, languagetool,...)
+- Install python-pylint for flycheck to work with python files. For more information on language support for flycheck, [[https://www.flycheck.org/en/latest/languages.html][read this]].
+- https://github.com/PillFall/languagetool.el -> ~sudo pacman -S languagetool~
+- Alternative Rechtschreibprüfung und Styleverbesserungen mit flycheck-aspell, powerthesaurus (nur Englisch?), synosaurus
+
+#+begin_src elisp
+(use-package flycheck
+  :ensure t
+  :defer t
+  :init (global-flycheck-mode))
+
+(use-package languagetool
+  :ensure t
+  :defer t
+  :config
+  (setq 
+   languagetool-java-arguments '("-Dfile.encoding=UTF-8" "-cp" "/usr/share/languagetool:/usr/share/java/languagetool/*")
+   languagetool-console-command "org.languagetool.commandline.Main"
+   languagetool-server-command "org.languagetool.server.HTTPServer"))
+   (setq safe-local-variable-values nil) ;wenn ich keine lokalen Regeln speichern will und mich die nachfrage nervt muss ich es hier nil setzen
+
+;; Alternativ: ~sudo pacman -S hunspell-de~
+;; (setq ispell-program-name "hunspell")
+;; (setq ispell-dictionary "de_DE")
+;; (add-hook 'text-mode-hook 'flyspell-mode)
+#+end_src
+
+* Dashboard
+- Ich brauche eine .org mit Links, einen minor mode für den ich keybindings vergeben kann und eine Zeile die den minor-mode aktiviert sobald die .org aufgerufen wird. Zudem ist es hilfreich wenn die Startseite im read only Modus ist um nicht ungewollte Veränderungen vorzunehmen.
+
+#+begin_src elisp
+(setq initial-buffer-choice "~/.config/emacs/start.org")
+
+(define-minor-mode mane-start-mode
+  "Ein eigener Minor Mode für personalisierte Startseite-Funktionen."
+  :lighter " Mane-Start"
+  :keymap (make-sparse-keymap)
+  :global nil)
+
+;; Hinzufügen von Keybindings zu mane-start-mode unter Verwendung von evil
+(with-eval-after-load 'evil
+  (evil-define-key 'normal mane-start-mode-map ;Keys sind nur um mane-start-mode vergeben
+    (kbd "o z") 'eshell
+    (kbd "a") '(lambda () (interactive) (org-agenda))
+    (kbd "b") '(lambda () (interactive) (find-file "/home/flowmis/cloud/life/raum/pkb/20240214T202735==mh--büro__projekt.org"))
+    (kbd "B") (lambda () (interactive) (find-file "/home/flowmis/cloud/life/raum/pkb/20240214T201134==mh--bücher__projekt.org"))
+    (kbd "c") (lambda () (interactive) (find-file "/home/flowmis/cloud/life/raum/pkb/20240214T202744==mh--chemie__projekt.org"))
+    (kbd "C") (lambda () (interactive) (find-file "/home/flowmis/cloud/life/raum/pkb/20240105T114933==mh--unterrichtsplanung__ch_pkb.org")) ;Eventuell Unterrichtsplanung mit Sport zusammenführen!?
+    (kbd "h") (lambda () (interactive) (find-file "/home/flowmis/cloud/life/raum/pkb/20240207T133915==mh--home__crypt_h_pkb.org"))
+    (kbd "w") (lambda () (interactive) (find-file "/home/flowmis/cloud/life/raum/pkb/20240212T121907==mh--work__crypt_pkb_w.org"))
+    (kbd "s") (lambda () (interactive) (find-file "/home/flowmis/cloud/life/raum/pkb/20240214T203427==mh--sport__projekt.org"))
+    (kbd "S") (lambda () (interactive) (find-file "/home/flowmis/cloud/life/raum/pkb/20231225T185132==mh--unterrichtsplanung__pkb_spo.org"))
+    (kbd "f") (lambda () (interactive) (find-file "/home/flowmis/flowmis-os/flowmis-os.org"))
+    (kbd "l") (lambda () (interactive) (find-file "~/cloud/life/"))
+    (kbd "p") (lambda () (interactive) (find-file "/home/flowmis/cloud/life/raum/pkb/20240214T203339==mh--projekte__projekt.org"))
+    ;delete/integrate later:
+    (kbd "L") (lambda () (interactive) (find-file "/home/flowmis/cloud/life/raum/pkb/20240214T163522==mh--latex__del.org"))
+    (kbd "k") (lambda () (interactive) (find-file "/home/flowmis/cloud/life/raum/pkb/20240204T114444==mh--kalender-inbox__del.org"))
+))
+
+   (add-hook 'mane-start-mode-hook 'read-only-mode) ;read-only-mode disablen wenn ich etwas ändern will (C-x C-q).
+   (provide 'mane-start-mode)
+#+end_src
+* Denote
+Siehe: https://protesilaos.com/emacs/denote#h:f3bdac2c-4704-4a51-948c-a789a2589790
+-> Installation: ~cd ~/.config/emacs/scripts/~ + ~git clone https://git.sr.ht/~protesilaos/denote denote~ + 
+~(add-to-list 'load-path "~/.config/emacs/scripts/denote")~ bei ausgelagerter Skripte angeben und dann die folgenden Konfigurationen vornehmen (Update mit git pull):
+- Wichtige Features:
+  - [[https://www.youtube.com/watch?v=gMq-703ZVZQ][Sorting and org-dynamic-blocks]] für Meta Notes (siehe auch [[https://www.youtube.com/watch?v=zzXcav0yb50][hier]])
+- Link zu org-header mit <M-x org-stroe-link> unter dem org-header speichert den Link dazu -> in der anderen Datei dann <M-x org-insert-link> um den Link einzufügen -> Beispiel: [[file:~/flowmis-os/flowmis-os.org::*Emacs][Emacs-Header in flowmis-os]]
+- Geht auch über eine Funktion, aber bei mir sind noch nicht alle aktiv, sondern nur die basics! Zudem kann ich ein org-header zu einer neuen denote notiz machen mit einer Funktion!
+#+begin_src elisp
+(require 'denote)
+;; Remember to check the doc strings of those variables.
+(setq denote-directory (expand-file-name "~/cloud/life/raum/pkb/"))
+(setq denote-known-keywords '("kl8" "kl9" "kl10" "ch" "spo" "nwt" "crypt" "pkb" "del" "h" "w" "vb" "hb" "fb" "bb" "ts" "bag" "lsw"))
+;; kl8 = Klasse 8; kl9 = Klasse 9; kl10 = Klasse 10; ch = Chemie; spo = Sport; nwt = Naturwissenschaft und Technik; crypt = verschlüsselte Inhalte; pkb = persönliche Knowledgebasis (longterm relevant); del = delete soon (kurzfristig relevant); h = Home; w = Work; vb,hb,fb,bb,ts,bag,lsw = Volleyball, Handball, Fußball, Basketball, Trendsportarten wie Tanzen und Kämpfen sowie Rollen Gleiten etc., Bewegen an Geräten, Laufen Springen Werfen))
+(setq denote-infer-keywords t)
+(setq denote-sort-keywords t)
+(setq denote-file-type nil) ; Org is the default, set others here
+(setq denote-prompts '(title keywords))
+(setq denote-excluded-directories-regexp nil)
+(setq denote-excluded-keywords-regexp nil)
+
+;; Pick dates, where relevant, with Org's advanced interface:
+(setq denote-date-prompt-use-org-read-date t)
+
+
+;; Read this manual for how to specify `denote-templates'.  We do not
+;; include an example here to avoid potential confusion.
+
+
+(setq denote-date-format nil) ; read doc string
+
+;; By default, we do not show the context of links.  We just display
+;; file names.  This provides a more informative view.
+(setq denote-backlinks-show-context t)
+
+#+end_src
+
+* Dired
+- Mit ( in die simple Ansicht wechseln (normale Ansicht - gibt ls Befehl samt dessen Flags/Configs aus)
+- Mit ) kann man Git commits ein/ausblenden
+- Ist man in einer Datei auf einem angegebenen Pfad kann man mit <SPC .> oder <C-x C-f> find-file öffnen und mit <Meta-n> den Pfad unter dem cursor öffnen
+- Mit & wird asynchron (der Buffer bzw. Emacs kann weiterhin genutzt werden) eine Datei extern geöffnet. Es wird geraten (xdg-open - man kann auch ein Standardprogramm definieren) welches externe Programm verwendet werden soll, oder bei mehr als einem möglichen kann man einen bash Befehl eingeben (pinta, brave,...). Mit <Meta-n> und <Meta-p> kann man aus vorherigen und vorgeschlagenen Programmen auswählen!
+- Mit ! wird synchron (der Buffer bzw. Emacs kann nicht genutzt werden solange die Datei geöffnet ist) eine Datei extern geöffnet. Es wird geraten welches externe Programm verwendet werden soll, oder bei mehr als einem möglichen kann man einen bash Befehl eingeben (pinta, brave,...). Mit <Meta-n> und <Meta-p> kann man aus vorherigen und vorgeschlagenen Programmen auswählen!
+- m = markieren
+- %m = markieren mit regexp. (z.B. .tex - dann werden alle Dateien mit .tex markiert und ich kann diese mit D löschen, mit R verschieben, oder mit C kopieren ohne alle manuell zu suchen!)
+- * = unterschiedliche Markierungsoptionen
+- *.jpg = markiert alle Dateien mit .jpg Endung
+- u/U = unmark/unmark all
+- d = delete file/directory
+- D = file/directory in den Papierkorb verschieben
+- W = open with - öffnet datei im Browser oder einem anderen Programm
+- x = execute
+- R = move file to and or rename it (entspricht quasi dem mir bekannten *Strg+x* - ausschneiden)
+- C = copy somewhere
+- c = compress
+- i = insert mode um Files umzubenennen (anschließend :w um es zu speichern)
+- M = Zugriffsrechte ändern
+  - Es ist ein Triplett (Buchstabe ganz vorne ist unwichtig (d steht für directory und - ist eine einfache Datei)), das wie folgt aufgebaut ist
+     USER GROUP OTHERS
+    drwx  -rwx  -rwx   (hier können alle r = read/ lesen, w = write/ schreiben/ bearbeiten und x = execute/ ausführen)
+     USER GROUP OTHERS
+    drwx  -r--  -r--   (hier hat nur der angegebene User die Möglichkeit zum lesen, schreiben und ausführen und die anderen können nur lesen)
+
+    r hat die Nummer 4, w hat die Nummer 2 und x die Nummer 1 -> Die Summe gibt die Rechte: +7 = nur der User hat alle Rechte -> +744 der user hat alle Rechte und die anderen haben nur Leserecht,
+  - Mit +x kann man allen die Funktion ausführen geben (geht auch mit +111)
+  -
+- t = kehrt markierung um und so kann aus markiertem das nicht markierte gemacht werden - sinnvoll wenn nur wenig nicht markiert werden soll
+- Alt + Enter = gute und schnelle/einfach Vorschau der Datei/Bild etc. in Buffern nebenan ohne Cursor in neuen Buffer yu wechseln
+- Dateien nach Inhalt durchsuchen: Mit m mehrere Dateien auswählen + A -> Wort eingeben das in den markierten Dateien gesucht werden soll
+_Find File:_
+- wenn man in einem Pfad ist muss man nicht zurück gehen bis zu dem Userverzeichnis und von dort das Eingeben beginnen, denn man kann einfach auch wenn ein anderer Pfad angezeigt ist mit ~/ beginnen und landet dann direkt dort
+- Pfade muss man nicht ausschreiben: Mit ~/D/s*u/so/a komme ich zu: ~/Dropbox/shared-unterricht/sonstiges/alkansäuren-zus.pdf
+  - Groß-/ Kleinschreibung ist hier wichtig
+  - mit s*u kann ich den richtigen Ordner wählen der mit s anfängt und dann bei zwei ordnern gleich weiter geht, sich dann aber beim u wieder unterscheidet und durch * mache ich dass alles möglich kommen kann und durch das u wähle ich dann den spezifischen Ordner
+  - mit so kann ich den Ordner wählen der mit s beginnt und mit o weiter geht und damit zum Beispiel nicht den Ordner wählen der auch mit s beginnt, aber dessen zweiter buchstabe ein h ist.
+- Mit <Meta-n> und <Meta-p> kann ich durchcyclen wenn ich zuvor in anderen Pfaden unterwegs war werden diese angezeigt
+- <% m> mit regex markieren
+- k (mit evil keybindings ist es K) um markiertes nicht mehr anzuzeigen und g (mit evil keybinds ist es revert buffer und das habe ich auf <SPC b r>) um wieder alles anzuzeigen
+- t alles markieren was nicht markiert ist und alles was markiert ist nicht mehr markieren - dreht markiertes quasi um sodass leicht nur noch das gefundenen durch regex angezeigt wird bzw ausgeblendet wird.
+- schönerers Dired mit weniger Details: <M-x dired-hide-details-mode>
+- Mit <M-p> und <M-n> in der Historie hin und her bewegen bei find-file für dired
+- In dired find-file kann man einfach einen vollständigen Pfad eingeben ~/... ohne zuvor dorthin zu gehen, oder bis dahin zu löschen -> man kann dort somit auch einfach einen fertigen Pfad hineinkopieren!
+- Bei find-file muss man auch nicht den ganzen Pfad ausschreiben, sondern man kann ~/cl/lif/ra/p schreiben um zu /home/flowmis/cloud/life/raum/pkb/ zu gelangen.
+- Mit ^ oder - kann man in dired eine Ebene nach oben und mit Enter öffnen oder eine Ebene tiefer -> Mit peep-dired geht es auch mit den evil vim keys!
+- Mit <Shift Enter> kann man eine Datei in einem seperatem Window öffnen und den Fokus in dieses Window setzen (Je nach Schriftgröße wird Emacs horizontal/vertikal das Window spliten)
+- Mit <Alt Enter> kann man eine Datein in einem seperatem Window öffnen ohne den Fokus in dieses Window zu setzen
+- Mit O kann man den owner einer Datei ändern
+- Mit R kann ich rename machen (ist zugleich Ausschneiden und Einfügen um eine Datei zu bewegen)
+- M um den Mode einer Datei zu ändern um sie beispielsweise ausführbar zu machen (chmod)
+- m und C und u unnd U und d und D und x sollten mir bewusst sein 
+- Mit i kann ich in den insert-mode und Dateien umbenennen und das dann mit <C-c C-c> bestätigen/schreiben
+- Mit + kann ich einen neuen Ordner hinzufügen, aber geht auch mit find-file um neue Ordner oder Dateien an einem Pfad zu erstellen
+- Makros sind hier sehr mächtig um gleiche Aktionen mehrfach automatisiert durchführen zu können (Datei öffnen und Inhalt einfügen oder ändern und wieder zurück in dired, oder einfach nur um schnell viele Dateien auf bestimmte Art umzubenennen)
+- Emacs ist clever wenn ich einen Split habe und etwas markiere und move oder copy ausführe es als Vorschlag direkt in den zweiten Buffer verschieben zu wollen
+- Wenn ich etwas kopiert habe und es in find file minibuffer einfügen will kann ich dies mit <Strg y> machen! Ich will das Keybinding nicht auf <Strg v> umstellen, da es bereits für andere Dinge (visual block mode und im minibuffer um nach unten zu springen verwendet wird)
+
+- Wenn ich einen Pfad in Emacs habe mit dem cursor auf dem Pfad bin und in fidn file gehe kann ich mit <M-n> den Pfad unter dem Cursor in find file einfügen
+  
+Anstatt ein weiteres Paket zu verwenden um Programme außerhalb Emacs mit einem bestimmten Programm zu öffnen (Beispielsweise die Pakete: open-with oder dired-open) kann ich mir auch Programme vorschlagen lassen (Öffnen mit !=synchron oder &=asynchron) -> Mit <M-n> und <M-p> kann ich zwischen den Vorschlägen wechseln.
+
+#+begin_src elisp
+(setq dired-guess-shell-alist-user
+      '(("\\.\\(png\\|jpe?g\\|tiff\\)" "viewnior" "gimp" "xdg-open")  ;xdg-open heißt Standardprogramm verwenden
+	("\\.\\(mp[34]\\|m4a\\|ogg\\|flac\\|webm\\|mkv\\)" "vlc" "xdg-open")
+		(".*" "xdg-open")))
+(use-package dired-open
+  :config
+  (evil-define-key 'normal dired-mode-map (kbd "h") 'dired-up-directory)
+  (evil-define-key 'normal dired-mode-map (kbd "l") 'dired-open-file) ; use dired-find-file instead if not using dired-open package
+  (setq dired-open-extensions '(("gif" . "vlc") ;Mit Enter (bzw. l) in Dired mit dem Cursor auf einer Datei führt zum öffnen mit dem hier festgelegten Programm
+				("pdf" . "zathura")
+				("docx" . "onlyoffice-desktopeditors")
+				("doc" . "onlyoffice-desktopeditors")
+				("odt" . "onlyoffice-desktopeditors")
+				("xlsx" . "onlyoffice-desktopeditors")
+				("pptx" . "onlyoffice-desktopeditors")
+				("ppt" . "onlyoffice-desktopeditors")
+				("jpg" . "viewnior")
+				("png" . "viewnior")
+				("mkv" . "vlc")
+				("mp4" . "vlc"))))
+;; peep-dired aktivieren wenn ich live Vorschau von Bildern oder Textdateien aktivieren will, dann sehe ich wenn ich mit j und k in dired durch die Dateien scrolle im Split-View die entsprechende Vorschau zur Datei! (ist nicht immer aktiviert, da ich das nicht immer will und geht nur im normalen mode, also mehrmals ESC und dann nochmal aktivieren in dired mit meinem Keymap und dann sollte das mit der Vorschau gehen!)
+(use-package peep-dired
+  :after dired
+  :hook (evil-normalize-keymaps . peep-dired-hook)
+  :config
+    (evil-define-key 'normal dired-mode-map (kbd "h") 'dired-up-directory)
+    (evil-define-key 'normal dired-mode-map (kbd "l") 'dired-open-file) ; use dired-find-file instead if not using dired-open package
+    (evil-define-key 'normal peep-dired-mode-map (kbd "j") 'peep-dired-next-file)
+    (evil-define-key 'normal peep-dired-mode-map (kbd "k") 'peep-dired-prev-file)
+)
+;; (add-hook 'dired-mode-hook 'dired-hide-details-mode) ;wenn ich dired übersichtlicher haben mag kann ich es hier aktivieren
+
+;(evil-define-key 'normal dired-mode-map
+  ;(kbd "M-RET") 'dired-display-file     ;benutzen um Bildervorschau in Splitbuffer zu zeigen, aber weiter in dired navigieren
+  ;(kbd "h") 'dired-up-directory
+  ;(kbd "l") 'dired-open-file
+  ;(kbd "m") 'dired-mark                 ;Mit %m kann man nach einer regular expression bestimmte Dateien markieren
+  ;(kbd "u") 'dired-unmark               ;Mit U kann man alles unmarken
+  ;(kbd "t") 'dired-toggle-marks         ;wenn zuvor 2 Datein markiert waren kann man mit t diese unmarken und alle anderen die unmarked waren marken -> sinnvoll wenn man viele Dateien bis auf ein paar wenige markieren will
+  ;(kbd "H") 'dired-do-kill-lines        ;markierte Dateien ausblenden (werden nicht gelöscht, aber bei Bearbeitungen hilfreich) -> Mit <g r> - revert Buffer kann man sie sich wieder anzeigen lassen
+  ;(kbd "C") 'dired-do-copy
+  ;(kbd "D") 'dired-do-delete
+  ;(kbd "J") 'dired-goto-file
+  ;(kbd "M") 'dired-chmod
+  ;(kbd "O") 'dired-chown
+  ;(kbd "P") 'dired-do-print
+  ;(kbd "R") 'dired-rename (bzw. move file)
+  ;(kbd "+") 'dired-create-directory
+  ;(kbd "% l") 'dired-downcase
+  ;(kbd "% u") 'dired-upcase
+  ;(kbd "; d") 'epa-dired-do-decrypt
+  ;(kbd "; e") 'epa-dired-do-encrypt
+;)
+(use-package dired-sidebar
+  :ensure t
+;;   :commands (dired-sidebar-toggle-sidebar)
+;;   :init
+;;   (setq dired-sidebar-theme 'nerd) ; Sie können das Thema anpassen
+;;   (setq dired-sidebar-use-term-integration t)
+;;   (setq dired-sidebar-use-custom-font t)
+)
+
+
+#+end_src
+* Erscheinungsbild
+** Highlight Todo
+Adding highlights to TODO and related words.
+#+begin_src elisp
+(use-package hl-todo
+  :hook ((org-mode . hl-todo-mode)
+         (prog-mode . hl-todo-mode))
+  :config
+  (setq org-todo-keywords '((sequence "TODO(t)" "WAITING(w)" "BIN DRAN(D)" "DELEGIERT(d@/!)" "|" "BEENDET(b@/!)" "ABGEBROCHEN(a@/!)"))
+	hl-todo-highlight-punctuation ":"
+        hl-todo-keyword-faces `(("TODO"        warning bold)
+				("WAITING"     error bold)
+				("BIN DRAN"    font-lock-constant-face bold)
+				("DELEGIERT"   font-lock-keyword-face bold)
+				("BEENDET"     success bold)
+				("ABGEBROCHEN" font-lock-doc-face bold))))
+#+end_src
+** Beacon Mode
+#+begin_src elisp
+(use-package beacon
+  :ensure t
+  :config
+  (beacon-mode 1))
+#+end_src
+** Modeline
+Falls die Icons nicht richtig angezeigt werden muss ich <M-x nerd-icons-install-fonts> ausführen und neu starten - siehe auch: https://github.com/seagle0128/doom-modeline
+#+begin_src elisp
+(use-package doom-modeline
+  :ensure t
+  :init (doom-modeline-mode 1)
+  :config
+  (setq doom-modeline-height 25     ;sets modeline height
+	    doom-modeline-bar-width 10  ;sets right bar width
+        doom-modeline-persp-name t  ;adds perspective name to modeline
+        doom-modeline-persp-icon t  ;adds folder icon next to persp name
+	    display-time-day-and-date t
+        display-time-24hr-format t)
+  (display-time-mode 1)
+)
+
+(use-package feebleline
+  :ensure t  ; Stellt sicher, dass feebleline automatisch installiert wird, falls es noch nicht installiert ist
+  :config
+  (feebleline-mode 1))  ; Aktiviert feebleline
+
+#+end_src
+** Moderner Look
+
+#+begin_src elisp
+(use-package org-modern
+  :ensure t
+  :hook
+  (org-mode . org-modern-mode)
+  (org-agenda-finalize . org-modern-agenda)
+  :config
+  ;; Grundlegende visuelle Anpassungen
+  (setq org-modern-todo t
+        org-modern-priority t
+        org-modern-tag t
+        org-modern-keyword t
+        org-modern-list '((43 . "➤") (45 . "•"))  ; Anpassen von Listen-Symbolen
+        org-modern-horizontal-rule t
+        org-modern-table t  ; Setzen Sie dies auf `t`, um Tabellen zu modernisieren
+  )
+  ;; Checkbox-Symbole anpassen
+  (setq org-modern-checkbox '((?X . "☑") (?- . "❍") (?\s . "☐")))
+)
+;; view-mode der Signalwörter, Propertie-Drawer etc. entfernt und die .org in einem view mode darstellt - ich finde org-modern ist ein gute Kompromiss zwischen reinem Markup Text und schöner Darstellung, sodass ich es aktuell nicht aktiviert habe! - siehe: https://github.com/amno1/org-view-mode
+;; (use-package org-view-mode
+  ;; :ensure t)
+#+end_src
+
+** Hide Org-Blocks
+#+begin_src elisp
+;; folgendes brauche ich nur wenn ich org-modern nicht aktiviert habe und will, dass die Blöcke ausgeblendet werden um org-mode schöner zu gestalten
+;; (defvar mane-org-blocks-hidden nil "Status of org block delimiters visibility.")
+;; (defun mane-toggle-org-block-delimiters ()
+  ;; "Toggle visibility of org block delimiters."
+  ;; (interactive)
+  ;; (save-excursion
+    ;; (goto-char (point-min))
+    ;; ;Entferne alle vorherigen Overlays
+    ;; (remove-overlays (point-min) (point-max) 'mane-org-overlay t)
+    ;; ;Füge Overlays basierend auf dem aktuellen Status hinzu oder entferne sie
+    ;; (if mane-org-blocks-hidden
+        ;; (progn
+          ;; (setq mane-org-blocks-hidden nil))
+      ;; (progn
+        ;; (while (re-search-forward "^#\\+\\(BEGIN\\|END\\)_\\([A-Za-z]+\\)" nil t)
+          ;; (let ((ov (make-overlay (match-beginning 0) (line-end-position))))
+            ;; (overlay-put ov 'invisible t)
+            ;; (overlay-put ov 'mane-org-overlay t)))
+        ;; (setq mane-org-blocks-hidden t)))))
+;; (add-hook 'org-mode-hook #'mane-toggle-org-block-delimiters)
+#+end_src
+** Schrift und Rahmen
+#+begin_src elisp
+;; Rahmen kann ich hier einstellen - aktuell nur in meinem Schreib/-Präsentationsmodus aktiv - für normales Arbeiten reicht olivetti
+(use-package spacious-padding
+  :ensure t
+  :custom
+  (spacious-padding-widths
+   '( :internal-border-width 1  ;refers to the space between the boundaries of the Emacs frame and where the text contents start.
+      :header-line-width 4
+      :mode-line-width 6
+      :tab-width 4
+      :scroll-bar-width 8
+      :right-divider-width 20   ;is the space between two side-by-side windows.
+      :fringe-width 200 ;Padding on either side of the window. The more specific keys :left-fringe-width and :right-fringe-wdith can be used for finer control. If those are not specified (or set to a nil value), they fall back to :fringe-width.
+      ))
+)
+
+(use-package fontaine
+  :ensure t
+  :custom
+  (fontaine-presets
+   '((regular
+      :default-family "JetBrains Mono"    ;Schriftart, die standardmäßig für Text verwendet wird, es sei denn, für bestimmte Textelemente ist eine andere Schriftart festgelegt
+      :default-weight medium                 ;normal medium oder bold für die Strichdicke
+      :default-height 130                            ;Schrifthöhe und dadurch Schriftgtröße
+      :line-spacing 4)                                   ;Zeilenabstand 
+     ;; Für meinen Schreib-/Präsentationsmodus habe ich mit large hiermit eine Möglichkeit die Schriftart in diesem Modus wenn ich mich hierauf beziehe anzupassen 
+     (write
+      :inherit regular
+      :default-family "times"
+      :default-height 230
+      :variable-pitch-family "JetBrains Mono"  ;brauche ich da sonst Tabellen verzerrt und nicht korrekt dargestellt werden
+      :variable-pitch-weight normal
+      :variable-pitch-height 1.0
+      :line-spacing 4)
+     (pres
+      :inherit regular
+      :default-family "alegreya sans"
+      :default-height 330
+      :variable-pitch-family "JetBrains Mono"  ;brauche ich da sonst Tabellen verzerrt und nicht korrekt dargestellt werden
+      :variable-pitch-weight normal
+      :variable-pitch-height 1.0
+      :line-spacing 4)
+     ))
+  :config
+  (fontaine-set-preset 'regular))
+
+;; Kommentare etc. in italic anzeigen -> This is working in emacsclient but not emacs. Your font must have an italic face available.
+(set-face-attribute 'font-lock-comment-face nil
+  :slant 'italic)
+(set-face-attribute 'font-lock-keyword-face nil
+  :slant 'italic)
+
+;; Brauche ich glaub nicht?
+;; (add-to-list 'default-frame-alist '(font . "JetBrains Mono-11"))
+
+#+end_src
+** Theme
+- Theme im [[https://emacsfodder.github.io/emacs-theme-editor/#theme-generated][Theme-Editor]] erstellen und die .el Datei dann als Theme in den ~/.config/emacs/theme Ordner speichern: https://github.com/emacsfodder/emacs-theme-editor
+-> meine Themes: [[/home/flowmis/flowmis-os/tangle/themes/][hier]].
+- Ich habe die Themes so angepasst, dass ich es einfach habe neue Farbparletten zu verwenden -> Farbpaletten erstellen [[https://coolors.co/414141-3e3e3e-7e7e7e-777777-828282][hier]]
+
+
+#+begin_src elisp
+  (add-to-list 'custom-theme-load-path "~/.config/emacs/themes/")
+
+  (use-package doom-themes
+    :config
+    (setq doom-themes-enable-bold t    ; if nil, bold is universally disabled
+	  doom-themes-enable-italic t) ; if nil, italics is universally disabled
+    ;; (load-theme 'doom-one t)
+    (load-theme 'mane-2 t)
+    ;; Enable custom neotree theme (all-the-icons must be installed!)
+    (doom-themes-neotree-config)
+    ;; Corrects (and improves) org-mode's native fontification.
+    (doom-themes-org-config))
+
+  (defun load-theme-mane-1 ()
+  "Lädt Theme mane-1"
+  (interactive)
+  (load-theme 'mane-1 t))
+
+  (defun load-theme-mane-2 ()
+  "Lädt Theme mane-2"
+  (interactive)
+  (load-theme 'mane-2 t))
+#+end_src
+** Transparenz
+With Emacs version 29, true transparency has been added.
+#+begin_src elisp
+(add-to-list 'default-frame-alist '(alpha-background . 95)) ; For all new frames henceforth
+#+end_src
+** Zooming In/Out
+#+begin_src elisp
+(global-set-key (kbd "C-+") 'text-scale-increase)
+(global-set-key (kbd "C--") 'text-scale-decrease)
+(global-set-key (kbd "<C-wheel-up>") 'text-scale-increase)
+(global-set-key (kbd "<C-wheel-down>") 'text-scale-decrease)
+#+end_src
+* Eshell & vterm
+- Eine Emacs 'shell' die in Elisp geschrieben ist.
+- Vterm is a terminal emulator within Emacs.  The 'shell-file-name' setting sets the shell to be used in M-x shell, M-x term, M-x ansi-term and M-x vterm.  By default, the shell is set to 'fish' but could change it to 'bash' or 'zsh' if you prefer.
+- [[https://github.com/jixiuf/vterm-toggle][vterm-toggle]] toggles between the vterm buffer and whatever buffer you are editing.
+
+#+begin_src elisp
+(use-package eshell-toggle
+  :custom
+  (eshell-toggle-size-fraction 3)
+  (eshell-toggle-use-projectile-root t)
+  (eshell-toggle-run-command nil)
+  (eshell-toggle-init-function #'eshell-toggle-init-ansi-term))
+
+(use-package eshell-syntax-highlighting
+  :after esh-mode
+  :config
+  (eshell-syntax-highlighting-global-mode +1))
+
+(setq eshell-rc-script (concat user-emacs-directory "eshell/profile")
+      ;; eshell-rc-script "~/.config/emacs/eshell/profile"
+      eshell-aliases-file (concat user-emacs-directory "eshell/aliases")
+      ;; eshell-aliases-file "~/.config/emacs/eshell/aliases"
+      eshell-history-size 5000
+      eshell-buffer-maximum-lines 5000
+      eshell-hist-ignoredups t
+      eshell-scroll-to-bottom-on-input t
+      eshell-destroy-buffer-when-process-dies t
+      eshell-visual-commands'("bash" "fish" "htop" "ssh" "top" "zsh")
+)
+
+(use-package vterm
+:config
+(setq shell-file-name "/bin/fish"
+      vterm-max-scrollback 5000))
+
+(use-package vterm-toggle
+  :after vterm
+  :config
+  (setq vterm-toggle-fullscreen-p nil)
+  (setq vterm-toggle-scope 'project)
+  (add-to-list 'display-buffer-alist
+               '((lambda (buffer-or-name _)
+                     (let ((buffer (get-buffer buffer-or-name)))
+                       (with-current-buffer buffer
+                         (or (equal major-mode 'vterm-mode)
+                             (string-prefix-p vterm-buffer-name (buffer-name buffer))))))
+                  (display-buffer-reuse-window display-buffer-at-bottom)
+                  ;;(display-buffer-reuse-window display-buffer-in-direction)
+                  ;;display-buffer-in-direction/direction/dedicated is added in emacs27
+                  ;;(direction . bottom)
+                  ;;(dedicated . t) ;dedicated is supported in emacs27
+                  (reusable-frames . visible)
+                  (window-height . 0.3))))
+#+end_src
+* Export
+Export Ordner in ~/cloud/life/zeit/void/export/
+** Präsentationen und PDFs
+- Da ich aktuell zathura benutze brauch ich kein pdf Programm in Emacs selbst, aber falls dem mal so ist sollte ich mir [[https://github.com/vedang/pdf-tools?tab=readme-ov-file][pdf-tools]] anschauen.
+- [NO-DEFAULT-PACKAGES] verhindert das Laden der Standard-Latex-Pakete, [PACKAGES] ermöglicht das Laden zusätzlicher Pakete und [EXTRA] enthält zusätzlichen LaTeX-Code, der in der Kopfzeile der Dokumentklasse platziert wird.
+- Wenn ich direkt aus emacs heraus ein Präsentationsmodus starten will sollte ich mir folgendes installieren,anschauen: org-tree-slide, hide-mode-line, centered-cursor-mode,...
+
+#+begin_src elisp
+(with-eval-after-load 'ox-latex
+  (add-to-list 'org-latex-classes
+	       '("maneart"
+		 "\\documentclass{article}
+			[NO-DEFAULT-PACKAGES]
+			[PACKAGES]
+			[EXTRA]"
+		 ("\\section{%s}" . "\\section*{%s}")
+		 ("\\subsection{%s}" . "\\subsection*{%s}")
+		 ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
+		 ("\\paragraph{%s}" . "\\paragraph*{%s}")
+		 ("\\subparagraph{%s}" . "\\subparagraph*{%s}")))
+  (add-to-list 'org-latex-classes
+	       '("manepres"
+		 "\\documentclass{beamer}
+			[NO-DEFAULT-PACKAGES]
+			[PACKAGES]
+			[EXTRA]"
+		 ("\\section{%s}" . "\\section*{%s}")
+		 ("\\subsection{%s}" . "\\subsection*{%s}")
+		 ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
+		 ("\\paragraph{%s}" . "\\paragraph*{%s}")
+		 ("\\subparagraph{%s}" . "\\subparagraph*{%s}")))
+)
+(setq org-latex-hyperref-template nil)
+#+end_src
+** Html
+- Wenn ich dann mal so weit bin und mir HTMLs aus meinen .org Dateien generieren will und auf meinem Server deployen sollte ich mir die Fortschritte von 
+[[https://github.com/tonyaldon/one.el][one.el]] anschauen, da ich das Paket bisher am besten fand (mächtig und doch ausreichend übersichtlich, aber da es sich noch verändert habe ich es vorerst nicht installier, da ich es aktuell noch nicht benötige)
+** Diagramme etc.
+- Das Paket für graphviz-dot-mode anschauen und über ditaa und mermaid informieren -> siehe auch: [[denote:20240214T085322][ditaa-dot-mermaid]] 
+** Zusatzinfo
+*** Allgemein
+- Mit <SPC me> kann man Exportoptionen aufmachen. Man beachte auch die Einstellungen ganz oben, wo man zum Beispiel sagen kann dass nur das aus dem momentan aktiven Subtree exportiert werden soll etc. -> Je nach installierten Paketen kann man hier dann pdf,word,html,md,latex etc. exportieren
+- Um Literaturverzeichnis automatisch in verschiedene Formate mit zu exportieren (lies auf Github alles zou org-ref) ist es sinnvoll mit einer CSL Datei lokal zu arbeiten -> siehe: https://www.youtube.com/watch?v=Xs59PGTfDC0
+- ASCII ist gut lesbares Emailformat
+- Word, Powerpoint, pdf, Html, md, latex, epub, json, csv,... alles kein Problem wenn richtig konfiguriert
+*** Source Code exportieren
+- org-babel-tangle für SourceCode
+  - Einzelnen src-Block zum tanglen makieren (mit <tangle: yes>):
+    ~#+begin_src python :tangle yes~
+  - Anschließend alle markierten Source-Blocks exportieren: Meta x org-babel-tangle (oder: Meta-Space mb)
+  - Automatisiert alle im Dokument enthaltene exportieren geht über einen Header am Anfang der file in Form von:
+    ~#+PROPERTY: header-args :tangle yes~
+    - Mit Strg c Strg c (C-c C-c) localer refresh (Änderungen werden aktiv). Meta x org-babel-tangle (Start Export)
+  - Zudem kann man statt ~:tangle yes~ auch ~:tangle Datei1.py~ angeben und dann wird es in die spezifische Datei mit gegebenem Namen die man angegeben hat getangled (überschrieben/neu erstellt falls noch nicht vorhanden)
+*** Pandoc
+- pandoc ist geiles Programm mit dem man unterschiedliche Formate ineinander umwandeln kann -> .org in .pdf oder in .docx -> ebenfalls kann man jede html easy in in eine org Datei umwandeln und bearbeiten was echt auch richtig geil sein kann!!!
+- Einfachster Befehl zum umwandeln nach installation von pandoc: <pandoc README.org -o README.pdf> um .org in .pdf Datei umzuwandeln <- genauere Befehle etc muss man bei pandoc nachschauen um Dinge vorab in MarkUpLanguage zu konfigurieren
+- pandoc kann man aber auch direkt aus Emacs benutzen (deutlich angenehmer als Befehle einzugeben, da man auch leichter die möglichen Formate einsehen kann) und muss nicht cli bzw. Terminal benutzen! -> über <SPC me> oder <M-x org-pandoc-export-to-...>
+*** Wenn alles passt sollte ich folgende Exporteinstellungen haben die richtig konfiguriert sind und alle funktionieren
+[[file:Bilder/Exportformat2022-06-29_18-44.png]]
+*** Sonstige Formate
++ Falls wie auf dem Bild bei pandoc z.B. das Powerpointformat pptx nicht angezeigt wird kann man es immer auch exportieren mit <M-x org-pandoc-export-to-...>
+  + Bei Powerpoint: <M-x org-pandoc-export-to-pptx>
+* Git
+- [[https://github.com/emacsmirror/git-timemachine][git-timemachine]] ein Programm um einfach in der git Historie hin und her zu wechseln. 'SPC g t' open the time machine on a file if it is in a git repo. 'CTRL-j' and 'CTRL-k' to move backwards and forwards through the commits.
+- [[https://magit.vc/manual/][Magit]] git client for Emacs.
+
+#+begin_src elisp
+(use-package git-timemachine
+  :after git-timemachine
+  :hook (evil-normalize-keymaps . git-timemachine-hook)
+  :config
+    (evil-define-key 'normal git-timemachine-mode-map (kbd "C-j") 'git-timemachine-show-previous-revision)
+    (evil-define-key 'normal git-timemachine-mode-map (kbd "C-k") 'git-timemachine-show-next-revision)
+)
+(use-package transient    ;kann sein dass ich es irgendwann nicht mehr brauche, aber hatte Problem mit magit und das hat es gelöst
+  :ensure t)
+
+;; Installiere und konfiguriere magit
+(use-package magit
+  :ensure t
+  :after transient)  ;; Stelle sicher, dass transient zuerst geladen wird - später mal wieder komplett ohne transient checken, denn dann sollte es eigentlich auch gehen
+#+end_src
+
+* GPT & LLMs
+- Ich will llama oder etwas das lokal als server bei mir zuhause läuft und gut in emacs integriert ist und mit dem text in meinen dateien (meinem 2nd brain) zusammenarbeiten kann!
+#+begin_src elisp
+(use-package gptel   ;id-tranclusion-gpt
+ :config
+ (setq gptel-api-key ""))
+#+end_src
+* Minibuffer - vertico, marginalia, consult, embark, orderless, company (complete anything)
+- [[https://company-mode.github.io/][Company]] is a text completion framework for Emacs. The name stands for "complete anything".  Completion will start automatically after you type a few letters. Use M-n and M-p to select, <return> to complete or <tab> to complete the common part. Muss ich mir noch einrichten
+- Die weiteren Pakete sind über dem Code beschrieben!
+- Alternativen: ivy, all-the-icons-ivy-rich, ivy-rich, helm, helm-swoop, counsel?... -> aktuell ist es wie [[https://www.youtube.com/watch?v=d3aaxOqwHhI][hier]], da dies sehr minimalistisch, funktional un wenig eingreifend in andere Dinge ist
+#+begin_src elisp
+(use-package company
+  :defer 2
+  :custom
+  (company-begin-commands '(self-insert-command))
+  (company-idle-delay .1)
+  (company-minimum-prefix-length 2)
+  (company-show-numbers t)
+  (company-tooltip-align-annotations 't)
+  (global-company-mode t))
+
+(use-package company-box
+  :after company
+  :hook (company-mode . company-box-mode))
+
+;; The `vertico' package applies a vertical layout to the minibuffer.
+;; It also pops up the minibuffer eagerly so we can see the available
+;; options without further interactions.  This package is very fast
+;; and "just works", though it also is highly customisable in case we
+;; need to modify its behaviour.
+;;
+;; Further reading: https://protesilaos.com/emacs/dotemacs#h:cff33514-d3ac-4c16-a889-ea39d7346dc5
+
+(use-package vertico
+  :ensure t
+  :config
+  (setq vertico-cycle t)
+  (setq vertico-resize nil)
+  (vertico-mode 1))
+
+;; The `marginalia' package provides helpful annotations next to
+;; completion candidates in the minibuffer.  The information on
+;; display depends on the type of content.  If it is about files, it
+;; shows file permissions and the last modified date.  If it is a
+;; buffer, it shows the buffer's size, major mode, and the like.
+;;
+;; Further reading: https://protesilaos.com/emacs/dotemacs#h:bd3f7a1d-a53d-4d3e-860e-25c5b35d8e7e
+(use-package marginalia
+  :ensure t
+  :config
+  (marginalia-mode 1))
+
+;; The `orderless' package lets the minibuffer use an out-of-order
+;; pattern matching algorithm.  It matches space-separated words or
+;; regular expressions in any order.  In its simplest form, something
+;; like "ins pac" matches `package-menu-mark-install' as well as
+;; `package-install'.  This is a powerful tool because we no longer
+;; need to remember exactly how something is named.
+;;
+;; Note that Emacs has lots of "completion styles" (pattern matching
+;; algorithms), but let us keep things simple.
+;;
+;; Further reading: https://protesilaos.com/emacs/dotemacs#h:7cc77fd0-8f98-4fc0-80be-48a758fcb6e2
+(use-package orderless
+  :ensure t
+  :config
+  (setq completion-styles '(orderless basic)))
+
+;; The `consult' package provides lots of commands that are enhanced
+;; variants of basic, built-in functionality.  One of the headline
+;; features of `consult' is its preview facility, where it shows in
+;; another Emacs window the context of what is currently matched in
+;; the minibuffer.  Here I define key bindings for some commands you
+;; may find useful.  The mnemonic for their prefix is "alternative
+;; search" (as opposed to the basic C-s or C-r keys).
+;;
+;; Further reading: https://protesilaos.com/emacs/dotemacs#h:22e97b4c-d88d-4deb-9ab3-f80631f9ff1d
+(use-package consult
+  :ensure t)
+
+;; The `embark' package lets you target the thing or context at point
+;; and select an action to perform on it.  Use the `embark-act'
+;; command while over something to find relevant commands.
+;;
+;; When inside the minibuffer, `embark' can collect/export the
+;; contents to a fully fledged Emacs buffer.  The `embark-collect'
+;; command retains the original behaviour of the minibuffer, meaning
+;; that if you navigate over the candidate at hit RET, it will do what
+;; the minibuffer would have done.  In contrast, the `embark-export'
+;; command reads the metadata to figure out what category this is and
+;; places them in a buffer whose major mode is specialised for that
+;; type of content.  For example, when we are completing against
+;; files, the export will take us to a `dired-mode' buffer; when we
+;; preview the results of a grep, the export will put us in a
+;; `grep-mode' buffer.
+;;
+;; Further reading: https://protesilaos.com/emacs/dotemacs#h:61863da4-8739-42ae-a30f-6e9d686e1995
+(use-package embark
+  :ensure t
+  :bind (("C-." . embark-act)
+         ("C-c C-c" . embark-collect)
+         ("C-c C-e" . embark-export))) ;die keybindings sind so sinnvoll vergeben und leader key mit spc für keybinding macht hier wenig Sinn!
+
+;; The `embark-consult' package is glue code to tie together `embark'
+;; and `consult'.
+(use-package embark-consult
+  :ensure t)
+
+;; The built-in `savehist-mode' saves minibuffer histories.  Vertico
+;; can then use that information to put recently selected options at
+;; the top.
+;;
+;; Further reading: https://protesilaos.com/emacs/dotemacs#h:25765797-27a5-431e-8aa4-cc890a6a913a
+(savehist-mode 1)
+
+;; The built-in `recentf-mode' keeps track of recently visited files.
+;; You can then access those through the `consult-buffer' interface or
+;; with `recentf-open'/`recentf-open-files'.
+;;
+;; I do not use this facility, because the files I care about are
+;; either in projects or are bookmarked.
+(recentf-mode 1)
+
+#+end_src
+* Kalender
+
+In der Nextcloud einen neuen Kalender erstellen und den cal dav link kopieren -> Achtung: Passt leider nicht und die Adresse muss etwas abgeändert werden:
+- so wird es unter =Interner Link= angezeigt und in den Zwischenspeicher kopiert: https://cloud.pyroma.net/remote.php/dav/calendars/mane/test/
+- in der Form muss es in die config.el (sollte ich im Namen des Kalenders Großbuchstaben haben muss ich diese hier klein angeben - URL im ganzen einfach testen und dann sollte wenn Adress passt folgendes im Browser angezeigt werden: This is the WebDAV interface. It can only be accessed by WebDAV clients such as the Nextcloud desktop sync client.):
+(setq org-caldav-url "https://cloud.pyroma.net/remote.php/dav/calendars/mane"
+      org-caldav-calendars '((:calendar-id "test"
+      ...
+- ACHTUNG: out of the box funktionieren bzw. synchroniseren nur timestamps und schedules bzw. deadlines nicht. Zudem werden für den sync an alle timestamps Properties Drawer mit unique id vergeben - macht es hässlicher, aber dadurch kann anständig gesynced werden!
+-> weitere Anleitung: https://github.com/dengste/org-caldav
+
+Die caldav-inbox speichert bzw. zieht alle Termine aus der Nextcloud und die unter caldav-files angegebenen Ordner werden in die Nextcloud hochgeladen, also nach oben gesynced. Es ist auch möglich nur in eine Richtung zu syncen, aber hier finde ich das nicht sinnvoll und will es in beide Richtungen
+-> wenn es nicht synced vll auch schauen dass die inbox datei ausreichend Berechtigungen hat etc.
+
+Schedules und Deadlines werden nur wenn man es angibt auch synchronisiert und ansonsten nur timestamps!
+
+(setq org-icalendar-use-deadline '(event-if-todo event-if-not-todo))
+(setq org-icalendar-use-scheduled '(todo event-if-todo event-if-not-todo))
+
+*Um das Passwort nicht immer eingeben zu müssen kann ich wie folgt vorgehen:*
+1. _.authinfo Datei erstellen:_ touch ~/.authinfo
+2. _.authinfo öffnen:_ nvim ~/.authinfo
+3. _folgende Zeile einfügen (***** durch richtiges Passwort ergänzen):_ machine cloud.pyroma.net:443 port https login mane password *****
+4. _.authinfo verschlüsseln:_ gpg -e -r <Ihr GnuPG-Schlüssel> ~/.authinfo
+5. _config anpassen (habe ich bei den Grundeinstellungen bereits hinzugefügt):_ (setq auth-sources '((:source "~/.authinfo.gpg")))
+-> nun muss ich nur mein Passwort für den gpg key eingeben und kennen!
+
+Mit [[https://github.com/kiwanami/emacs-calfw][calfw]] erhält man einen schönen org-mode-kalender-buffer für die Übersicht: <cfw:open-org-calendar>
+
+#+begin_src elisp
+(use-package org-caldav
+  :ensure t
+  :config
+  (setq org-caldav-url "https://cloud.pyroma.net/remote.php/dav/calendars/mane"
+	  org-caldav-calendars '((:calendar-id "kalender"))
+	  org-caldav-inbox "/home/flowmis/cloud/life/raum/pkb/20240204T114444==mh--kalender-inbox__del.org"
+	  org-icalendar-timezone "Europe/Berlin"
+	  org-icalendar-use-deadline '(event-if-todo event-if-not-todo)
+	  org-icalendar-use-scheduled '(todo event-if-todo event-if-not-todo)
+	  org-caldav-files '(
+			     "/home/flowmis/cloud/life/raum/pkb/20240207T133915==mh--home__crypt_h_pkb.org"
+                           "/home/flowmis/cloud/life/raum/pkb/20240212T121907==mh--work__crypt_pkb_w.org"
+                           "/home/flowmis/cloud/life/raum/pkb/20240105T114933==mh--unterrichtsplanung__ch_pkb.org"
+                           "/home/flowmis/cloud/life/raum/pkb/20231225T185132==mh--unterrichtsplanung__pkb_spo.org"
+			     "/home/flowmis/cloud/life/raum/pkb/20240214T202735==mh--büro__projekt.org"
+			     "/home/flowmis/cloud/life/raum/pkb/20240214T203339==mh--projekte__projekt.org"
+                           )
+	  org-caldav-save-directory "~/cloud/life/zeit/archiv/kalender/"     ; um sync von mehreren Geräten zu ermöglichen brauchen sie die gleiche historie (mit org-caldav-delete-everything kann ich die vorhergehende historie löschen)
+	  ) ;hier kann ich weitere hinzfügen, aber irgendwie werden schon ein paar erkannt ohne dass ich sie hier angebe - verlinkte Dateien?
+)
+#+end_src
+* TODO Mail
+[[denote:20230828T155220][emacs-mu4e-mail]]
+#+begin_src elisp
+;; (use-package smtpmail
+;;   :ensure nil ;; smtpmail ist Teil von Emacs, daher kein externes Paket
+;;   :config
+;;   (setq send-mail-function 'smtpmail-send-it
+;;         message-send-mail-function 'smtpmail-send-it
+;;         starttls-use-gnutls t
+;;         smtpmail-stream-type 'starttls
+;;         smtpmail-default-smtp-server "smtp.gmail.com"
+;;         smtpmail-smtp-server "smtp.gmail.com"
+;;         smtpmail-smtp-service 587
+;;         smtpmail-debug-info t))
+
+;; (use-package mu4e
+;;   :ensure nil ;; Angenommen, mu4e ist bereits installiert
+;;   :config
+;;   (setq mu4e-sent-messages-behavior 'sent
+;;         mu4e-sent-folder "/home/flowmis/.mail/Gesendet"
+;;         mu4e-drafts-folder "/home/flowmis/.mail/Entwürfe"
+;;         mu4e-trash-folder "/home/flowmis/.mail/Papierkorb"
+;;         mu4e-root-maildir "/home/flowmis/.mail"
+;;         mu4e-get-mail-command "mbsync -a"
+;;         mu4e-update-interval 300 ;; Sekunden
+;;         mu4e-compose-signature-auto-include nil
+;;         mu4e-attachment-dir "~/Downloads"
+;;         mu4e-use-fancy-chars t
+;;         mu4e-maildir-shortcuts '(("/home/flowmis/.mail/Papierkorb" . ?p)
+;;                                  ("/home/flowmis/.mail/Archiv" . ?a)
+;;                                  ("/home/flowmis/.mail/Entwürfe" . ?e)
+;;                                  ("/home/flowmis/.mail/Gesendet" . ?g))))
+
+;; (use-package org-mu4e
+;;   :ensure nil ;; org-mu4e ist Teil des mu4e-Pakets
+;;   :config
+;;   (setq org-mu4e-convert-to-html t))
+#+end_src
+* TODO Makros
+kmacro-lambda-form ist veraltet und sollte durch kmacro ersetzt werden seit emacs 29 -> Generell muss ich die Makros hier updaten, da yasnippets anders funktioniert und eine zusätzliche Bestätigung braucht. Zudem müssen die Links die ich klicke für den Export geupdatet werden und die erste Funktion durch (evil-close-fold) ersetzt werden,... -> Bei Gelegenheit mal komplet neu machen und am besten auch einfach ohne Icon und nur mit Link über dem Name, sodass es dann so aussieht:
+"* [[elisp:(progn (evil-close-fold) (evil-visual-line) (export-ch-presentation) (delete-tex-files))][Präsentation]] :pres:"
+
+#+begin_src elisp
+; Funktion um nach export die .tex Dateien zu löschen!
+(defun delete-tex-files ()
+  "Löscht alle .tex-Dateien im Verzeichnis /home/flowmis/cloud/life/energie/work/unterricht/export."
+  (interactive)
+  (let ((directory "/home/flowmis/cloud/life/energie/work/unterricht/export/"))
+    (dolist (file (directory-files directory t "\\.tex$"))
+      (delete-file file))
+    (message "Alle .tex-Dateien im Verzeichnis gelöscht.")))
+;; Stellen Sie sicher, dass evil installiert und geladen ist
+(with-eval-after-load 'evil
+(fset 'export-ch-presentation (kmacro-lambda-form [?\C-x ?n ?n escape tab down ?V ?G ?\C-x ?n ?n escape ?g ?g ?O ?< ?e ?p ?c tab enter escape ?  ?m ?e ?l ?p ?u ?\C-x ?n ?w up tab ?\C-l] 0 "%d"))
+(fset 'export-ch-ta (kmacro-lambda-form [?\C-x ?n ?n escape tab down ?V ?G ?\C-x ?n ?n escape ?g ?g ?O ?< ?e ?t ?a ?c tab escape ?  ?m ?e ?l ?p ?u ?\C-x ?n ?w up tab ?\C-l] 0 "%d"))
+(fset 'export-ch-zusatz (kmacro-lambda-form [?\C-x ?n ?n escape tab down ?V ?G ?\C-x ?n ?n escape ?g ?g ?O ?< ?e ?a ?4 tab escape ?  ?m ?e ?l ?p ?u ?\C-x ?n ?w up tab ?\C-l] 0 "%d"))
+(fset 'export-ch-ib (kmacro-lambda-form [?\C-x ?n ?n escape tab down ?V ?G ?\C-x ?n ?n escape ?g ?g ?O ?< ?e ?i ?b tab escape ?  ?m ?e ?l ?p ?u ?\C-x ?n ?w up tab ?\C-l] 0 "%d"))
+(fset 'export-ch-svp (kmacro-lambda-form [?\C-x ?n ?n escape tab down ?V ?G ?\C-x ?n ?n escape ?g ?g ?O ?< ?e ?s ?v ?p ?c tab escape ?  ?m ?e ?l ?p ?u ?\C-x ?n ?w up tab ?\C-l] 0 "%d"))
+(fset 'export-ch-ab (kmacro-lambda-form [?\C-x ?n ?n escape tab down ?V ?G ?\C-x ?n ?n escape ?g ?g ?O ?< ?e ?a ?b tab escape ?  ?m ?e ?l ?p ?u ?\C-x ?n ?w up tab ?\C-l] 0 "%d"))
+(fset 'export-aas (kmacro-lambda-form [?\C-x ?n ?n escape tab down ?V ?G ?\C-x ?n ?n escape ?g ?g ?O ?< ?e ?a ?a ?s tab escape ?  ?m ?e ?l ?p ?u ?\C-x ?n ?w up tab ?\C-l] 0 "%d"))
+(fset 'nameing (kmacro "M-! . SPC / h o m e / f l o w m i s / c l o u d / l i f e / e n e r g i e / s e l f - s o v e r e i g n i t y / t e c h / s k r i p t e - p r o g r a m m e - c o n f i g s / s k r i p t e / n a m e i n g . s h <return>"))
+(fset 'ordner-struktur-auflösen (kmacro "M-! . SPC / h o m e / f l o w m i s / c l o u d / l i f e / e n e r g i e / s e l f - s o v e r e i g n i t y / t e c h / s k r i p t e - p r o g r a m m e - c o n f i g s / s k r i p t e / o r d n e r - a u f l . s h <return> d x y"))
+)
+#+end_src
+
+Makros am besten in einer seperaten macro.el speichern und diese über config.el oder init.el zum Start von Emacs hinzufügen dass es immer abrufbar ist
++ F3 neues Macro (F3 während der Aufnahme fügt einen Macro counter ein, der beim ausführen des Macros dann nach oben zählt - für Tabellen und List Items etc. ganz sinnvoll)
++ F4 Makro ausführen
++ Mit qq kann man ebenfalls Macroaufnahme starten und mit q dann wieder beenden
++ <M-x name-last-macro> um dem aufgenommenen Makro einen Namen zu geben
++ <M-x insert-kbd-macro> um den Emacs Code einzufügen
+    (fset 'Begrüßung
+    (kmacro-lambda-form [?i ?H ?a ?l ?l ?o ?  ?s ?e ?h ?r ?  ?g ?e ?e ?h ?r ?t ?e ?  ?, return ?b ?l ?a ?b ?l ?a ?b ?l ?a home return] 0 "%d"))
++ <M-x Begrüßung> startet Makro über den gegebenen Namen
++ Mit <C-x C-k r> ein Macro auf alle ausgewählten Zeilen anwenden
++ Mit einem Counter arbeiten:
+  - <C-x C-k C-c> um einen Counter einzustellen (von welcher Zahl aufwärts gezählt wird). Mit F3 ein Macro starten. Mit erneutem drücken von F3 den Counter einfügen und das Macro fertig machen und dann mit F4 festlegen. Beim abrufen von F4 wird der counter nun automatisch nach oben zählen.
++ Will man ein Macro unterbrechen und entscheiden ob es nach diesem Schritt weiter macht, oder einzelne Schritte auslässt, kann man bei der Aufnahme des Macros <C-x q> drücken und dadurch Stopps einbauen. Mit diesen Stellen die man mit <C-x q> in ein Macro einfügt kann man ein Macro sehr schön variieren und dadurch vielseitiger einsetzen!
+  - SPC (oder y) - weiter im Macro
+  - DEL (oder n) - beende das Macro
+  - Mit <C-r> kann ich nun in einen Modus wechseln in dem ich beliebige Veränderung vornehmen kann und mit <C-Alt c> komme ich aus dem edit heraus und kann das Macro von dem unterbrochenen Stand aus weiter machen lassen
++ Nameing und Saving:
+  - Letztes Macro einen Namen geben <C-x C-k n>
+  - Für die Session einem Keybinding zuordnen: (C-x C-k b) - Umlaute eignen sich gut da diese nicht belegt sind (C-x ü) wäre ein gutes Beispiel
++ Es ist nicht sinnvoll wie ich es aktuell mache die Makros immer wieder neu zu starten wenn ich sie doch ganz easy bearbeiten kann (<C-x C-k e> bzw. kmacro-edit-makro-repeat) wenn ich eine Kleinigkeit vergessen habe! -> Generell besser mit Macros beschäftigen -> Befehle sehe ich wenn ich <C-x C-k eingebe> https://www.youtube.com/watch?v=Xm1RmN-wHdg
+
+(after! evil
+(fset 'mane-export-presentation (kmacro-lambda-form [?\C-x ?r ?m ?1 return ?  ?s ?b ?# ?  ?# ?+ ?s ?e ?t ?u ?p ?f ?i ?l ?e ?: ?  ?~ ?d ?r ?o ?p ?b ?o ?x ?/ ?2 ?n ?d ?- ?b ?r ?a ?i ?n ?/ ?l ?a ?t ?e ?x ?/ ?p ?r ?ä ?s ?e ?n ?t ?a ?t ?i ?o ?n ?- ?c ?h ?e ?m ?i ?e ?- ?v ?o ?r ?l ?a ?g ?e ?. ?o ?r ?g return ?V down down ?  tab tab ?\C-x ?r ?b ?1 return ?V ?\C-x ?n ?n escape tab down ?V ?G ?\C-x ?n ?n escape ?  ?m ?e ?l ?p ?g ?g ?\C-x ?n ?w up tab ?\C-x ?r ?m ?1 return ?  ?s ?b ?# ?  ?# ?+ ?s ?e ?t ?u ?p ?f ?i ?l ?e ?: ?  ?~ ?d ?r ?o ?p ?b ?o ?x ?/ ?2 ?n ?d ?- ?b ?r ?a ?i ?n ?/ ?l ?a ?t ?e ?x ?/ ?p ?r ?ä ?s ?e ?n ?t ?a ?t ?i ?o ?n ?- ?c ?h ?e ?m ?i ?e ?- ?v ?o ?r ?l ?a ?g ?e ?. ?o ?r ?g return ?V down down ?  tab tab ?\C-x ?r ?b ?1 return] 0 "%d")))
+(map! :leader
+      :desc "Execute macro"
+      "m m 3" #'mane-export-presentation)
+* Multiedit/Mulitple Cursor
+- Es gibt das Paket [[https://github.com/magnars/multiple-cursors.el][multiple-cursors]] und das Paket [[https://github.com/hlissner/evil-multiedit][evil-multiedit]] (von hlissner). Für meinen Einsatz sind beide eigentlich ausreichend
+- Keybindings muss ich noch setzen und lernen es zu nutzen.
+#+begin_src elisp
+(use-package evil-multiedit
+  :ensure t
+  :config
+  ;; Ihre Konfigurationen für Evil Multiedit hier
+)
+
+;; (use-package multiple-cursors
+;;   :config
+;;   (setq mc/always-run-for-all 1)
+;;   (global-set-key (kbd "C-c m m") 'mc/mark-next-like-this)
+;;   (global-set-key (kbd "C-c m M") 'mc/mark-all-dwim)
+;;   (global-set-key (kbd "C-c m a") 'mc/edit-lines)
+;;   (global-set-key (kbd "C-c m q") 'mc/keyboard-quit)
+;;   (global-set-key (kbd "C-c m n") 'mc/skip-to-next-like-this)
+;;   (global-set-key (kbd "C-c m p") 'mc/skip-to-previous-like-this)
+;;   (define-key mc/keymap (kbd "<return>") nil))
+#+end_src
+* Org
+** Agenda
+#+begin_src elisp
+(with-eval-after-load 'org
+  ;; Setzen von org-todo-keywords und anderen org-bezogenen Konfigurationen
+  (setq 
+   org-agenda-files '("/home/flowmis/cloud/life/raum/pkb/20240207T133915==mh--home__crypt_h_pkb.org"
+                      "/home/flowmis/cloud/life/raum/pkb/20240212T121907==mh--work__crypt_pkb_w.org"
+                      "/home/flowmis/cloud/life/raum/pkb/20240105T114933==mh--unterrichtsplanung__ch_pkb.org"
+                      "/home/flowmis/cloud/life/raum/pkb/20231225T185132==mh--unterrichtsplanung__pkb_spo.org"
+                      "/home/flowmis/cloud/life/raum/pkb/20240204T114444==mh--kalender-inbox__del.org"
+                      )
+   org-agenda-custom-commands '(("d" "Daily agenda and all TODOs"
+				 ((tags "PRIORITY=\"A\""
+					((org-agenda-skip-function '(org-agenda-skip-entry-if 'todo 'done))
+					 (org-agenda-overriding-header "Es eilt:")))
+				  (agenda "" ((org-agenda-start-day "-1d")
+					      (org-agenda-span 14)
+					      (org-agenda-overriding-header "Agenda:")))
+				  (alltodo ""
+					   ((org-agenda-skip-function '(or (mane-skip-subtree-if-habit)
+									   (mane-skip-subtree-if-priority ?A)
+									   (org-agenda-skip-if nil '(scheduled deadline))))
+					    (org-agenda-overriding-header "Irgendwann erledigen:"))))))))
+
+;; Definieren der Hilfsfunktionen außerhalb von with-eval-after-load
+(defun mane-skip-subtree-if-priority (priority)
+  "Skip agenda subtree if it has a specific priority."
+  (let ((subtree-end (save-excursion (org-end-of-subtree t)))
+        (pri-value (* 1000 (- org-lowest-priority priority)))
+        (pri-current (org-get-priority (thing-at-point 'line t))))
+    (if (= pri-value pri-current)
+        subtree-end
+      nil)))
+
+(defun mane-skip-subtree-if-habit ()
+  "Skip an agenda entry if it has a STYLE property equal to =habit=."
+  (let ((subtree-end (save-excursion (org-end-of-subtree t))))
+    (if (string= (org-entry-get nil "STYLE") "habit")
+        subtree-end
+      nil)))
+#+end_src
+*** BEENDET Beispiel für org-header für die org-Agenda [0/1]
+CLOSED: [2022-08-15 Mo 13:21] SCHEDULED: <2022-08-20 Sa 08:00>
+:LOGBOOK:
+- State "BEENDET"    from "TODO"       [2022-08-15 Mo 13:21] \\
+  Kommentare sehen aus wie dieser Text
+- State "TODO"       from "BEENDET"    [2022-08-15 Mo 13:06]
+- State "BEENDET"    from "TODO"       [2022-08-15 Mo 13:05] \\
+  finished 2nd time
+- State "TODO"       from "BEENDET"    [2022-08-15 Mo 13:05]
+- State "BEENDET"    from "TODO"       [2022-08-15 Mo 13:04] \\
+  finished
+:END:
+- Mit Enter im normalen Modus kann man TODO als beendet markieren (und auch zurück) und so wie ich TODOs eingestellt habe noch eine Notiz hinzufügen - diese geht dann in den fals noch nicht vorhandenen automatisch erstellten :LOGBOOK: Drawer!
+- Nach dem Beenden kann ich es auch in meine Archiv-Datei verschieben mit <Spc m A>
+- Mit <Spc m t> kann man etwas als TODO markieren oder mit <C-c C-t>
+- Switchen ziwschen States mit Shift und Pfeiltasten ist bei meinen Einstellungen nicht ideal weil jedes mal die Kommentarfunktion aufgeht bis man gewünschten Modus hat und es im Logbuch festgehalten wird -> Lieber das richtige mit <C-c C-t> direkt zuweisen und kommentieren
+- Mit <Spc m d s> kann ich org-schedule öffnen & mit <Spc m d d> Deadlines festlegen
+- Im Kalender kann ich mit Shift Pfeiltasten den Tag ändern und mit Shift < oder Shift > die Monate
+- Gibt man 8pm ein wird automatisch 20:00 eingetragen -> 8am checkt es auch
+- hat man bei dem TODO bereits ein schedule kann man es durch erneutes festlegen überschrieben
+- Wenn Cursor auf Timestamp ist kann man diesen mit Shift und Pfeiltasten ebenfalls ändern
+- Alles was als BEENDET markiert ist und kein aktiven TODO State mehr hat wird nicht in der Agenda angezeigt
+- Mit ++ 1d kann man es jeden Tag von dem angegebenen an in der org-agenda erscheinen lassen bis es erledigt ist <2022-08-17 Mi 19:00 ++1d>
+- Mit -- zwischen 2 Timestamps kann man einen Zeitraum eingeben indem es in der Agenda erscheinen soll <2022-08-17 Mi 19:00>--<2022-08-20 Sa 19:00>
+- Wenn es sich alle 5 Tage wiederholen soll muss man besipielsweise folgendes eingeben <2022-08-17 Mi 19:00 +5d>... viele weiter Einstellungen -> siehe docs zu org-agenda etc.
+- [-] Mit <Spc m x> oder <C-c C-c> kann ich Listitems abhaken
+  - [ ] Beim abhaken von Unteritems kommt ein - in den Kasten der anzeigt dass etwas aber noch nicht alles gemacht wurde
+  - [X] das hier als Unteritem wurde erledigt
+- weiter TODO Einstellungsdinge siehe [[id:5921669e-4ba2-48fa-b12b-c46aa70388d3][Grundlagen TODOs, Deadlines, Schedules, Tutorials]]
+- Keybindings innerhalb der Agenda:
+  - <Spc -> Priorität ändern
+Meine Agenda ermöglicht das sammeln und bearbeiten von bestimmten Aufgaben aus unterschiedlichen Dateien um einen Überblick über alles was erledigt werden muss zu bekommen.
+- Erweiterung ist =org-super-agenda= kann hilfreich sein:
+  - Wofür braucht man die org-super-agenda?: Der normale Tages-/Wochenkalender, wird dadurch um frei definierbare Gruppierungen ergänzt. Egal ob nach Tags gruppiert wird, nach habbits, nach bestimmten ToDo-Schlüsselwörtern, oder anderen Elementen (bestimmte Prioritäten,...).
+- Erklärung and Konfigurationsanleitung [[https://github.com/alphapapa/org-super-agenda][hier]]
+- Wie man eine Agenda richtig organisiert:
+  - Sortierfunktion nach:
+    1. TODOs (Priorität vll-sicher)                                   -> TODO-Item + PRIO
+    2. TODOs die zu einer bestimmten Zeit erledigt sein müssen        -> TODO-Item + TIMESTAMP (DEADLINE)
+    3. TODOs die erst zu einem bestimmten Zeitpunkt begonnen werden   -> TODO-Item + TIMESTAMP (SCHEDULED)
+    4. TODOs die regelmäig erledigt werden sollen                     -> TODO-Item umbenannt zu ROUTINE (siehe auch [[https://orgmode.org/manual/Tracking-your-habits.html][hier]])
+- Agendafiles in meiner config definieren! ~(setq org-agenda-files '("//home/flowmis/shared/dropbox/.../"))~
+- Eigene Agenda Befehle:
+  - Agenda aufteilen in 3 Bereiche - Prio A TODOs + Fristen und Terminen + restliche TODOs (herausfiltern von Prio A TODOs, TODOs mit Fristen und Terminen und Routine/habit TODOs aus restlichen TODOs um Doppelung zu vermeiden)
+- Keys Agenda-View -> go into agenda + <Mx agenda> to see all Keyshortcuts
+
+-> eisenhower-matrix-sort-tasks.png
+
+- Q1 -> Zeitnah/Priorisiert erledigen -> Mit Prio A in Agend
+- Q2 -> Schedule/Kalendereintrag/Erinnerung einrichten -> Mit Prio B und Schedule in Agend
+- Q3 -> Delegate da es mir nicht wichtig/wertvoll genug ist um es zu erledigen, oder als Notiz in einer Kategorie speichern und Ordnen falls es mal wichtig wird -> Mit Prio C in Agenda
+- Q4 -> Avoid -> nicht in TODO oder Agenda aufnehmen!
+
+** Blocks
+*** tag expansion mit Org-tempo 
+Ist kein eigenes Paket sondern ein Modul in org das man aktivieren kann um '<s' mit TAB zu einem source-block umzuwandeln. Weitere Möglichkeiten: Änderungen dann lieber mit yasnippets und dann kann ich den Teil hier eigentlich auch löschen!
+
+ | Typing the below + TAB | Expands to ...                          |
+ |------------------------+-----------------------------------------|
+ | <a                     | '#+BEGIN_EXPORT ascii' … '#+END_EXPORT  |
+ | <c                     | '#+BEGIN_CENTER' … '#+END_CENTER'       |
+ | <C                     | '#+BEGIN_COMMENT' … '#+END_COMMENT'     |
+ | <e                     | '#+BEGIN_EXAMPLE' … '#+END_EXAMPLE'     |
+ | <E                     | '#+BEGIN_EXPORT' … '#+END_EXPORT'       |
+ | <h                     | '#+BEGIN_EXPORT html' … '#+END_EXPORT'  |
+ | <l                     | '#+BEGIN_EXPORT latex' … '#+END_EXPORT' |
+ | <q                     | '#+BEGIN_QUOTE' … '#+END_QUOTE'         |
+ | <s                     | '#+BEGIN_SRC' … '#+END_SRC'             |
+ | <v                     | '#+BEGIN_VERSE' … '#+END_VERSE'         |
+
+ #+begin_src elisp 
+ (require 'org-tempo)
+ #+end_src
+
+*** Chemie in org
+ - ~pip install rdkit~
+ - [[https://de.wikipedia.org/wiki/Simplified_Molecular_Input_Line_Entry_Specification][smiles (Simplified Molecular Input Line Entry System)]]
+ - siehe:
+  - https://www.youtube.com/watch?v=9Z9XM9xamDU
+  - https://www.youtube.com/watch?v=CUX7ZLunoO4
+
+ ##+begin_src jupyter :session yes
+ #from rdkit import Chem
+ ##+end_src
+
+ ##+begin_src jupyter :session yes
+ #m = Chem.MolFromSmiles('C(C(CO[N+](=O)[O-])O[N+](=O)[O-])O[N+](=O)[O-]')
+ #m
+ ##+end_src
+
+** Bullets
+Org-bullets gives us attractive bullets rather than asterisks.
+
+#+begin_src elisp
+;; brauche ich nur, wenn ich org-modern unter Erscheinungsbild nicht bereits aktiviert habe
+;; (add-hook 'org-mode-hook 'org-indent-mode)
+;; (use-package org-bullets)
+;; (add-hook 'org-mode-hook (lambda () (org-bullets-mode 1)))
+#+end_src
+
+** Clock Time
+:LOGBOOK:
+CLOCK: [2024-03-01 Fr 10:33]--[2024-03-01 Fr 10:42] =>  0:09
+CLOCK: [2024-03-01 Fr 10:32]--[2024-03-01 Fr 10:33] =>  0:01
+:END:
+https://www.youtube.com/watch?v=o6rE18Mxu9U
+- Zeit festhalten in der ich an einem Bulletpoint gearbeitet habe: Keybinding aktuell in org-mode keybindings auf <M-t> und <M-T> festgelegt
+  1. Zu Bulletpoint gehen und org-clock-in ausführen (startet die Zeitmessung)
+  2. Mit org-clock-out die Messung beenden und es automatisch in das Logbuch des Bulletpoints schreiben
+  3. Mit org-clock-report kann ich mir eine Übersicht anzeigen lassen die wie folgt aussieht:
+     #+BEGIN: clocktable :scope subtree :maxlevel 2
+     #+CAPTION: Clock summary at [2024-03-01 Fr 10:34]
+     | Headline       | Time   |      |
+     |----------------+--------+------|
+     | *Total time*   | *0:01* |      |
+     |----------------+--------+------|
+     | \_  Clock Time |        | 0:01 |
+     #+END:
+  4. Will ich es nicht um den Subtree zu tracken sondern eine ganze Datei muss ich den Befehl ganz oben in der Datei ausführen, dann steht bei scope statt "subtree" "file"
+  5. Anpassungen machen: 
+     - :maxlevel erhöhen wenn ich auch tiefere Subtrees in der Übersicht gelistet bekommen will
+     - :tags t zeigt den Tag des bulletpoints mit an um besser zu verstehen woran gearbeitet wurde
+     - :compact t zeigt die Kompaktansicht (Headertiefe wird nicht angezeigt)
+     - :block kann angepasst werden mit (today, yesterday, thisweek, thismonth,...) um eine zeitliche eingegrenzte Übersicht zu erhalten
+     - Mit elisp code in :scope kann man auch dafür sorgen, dass Informationen aus mehreren Dateien gesammelt werden 
+       - Beispiel 1 für spezielle Dateien: :scope ("Pfad zur Datei 1" "Pfad zur Datei 2")
+       - Beispiel 2 für Dateien in einem Ordner - macht bei vorhandenen agenda files Probleme - hier lieber mit agenda als scope arbeiten!: :scope (lambda () (directory-files-recursively "~/cloud/life/zeit/papierkorb/" ".org"))
+       - Beispiel 3 - hierfür in der config die agenda files vorab definieren!: :scope agenda 
+** Download
+siehe [[https://github.com/abo-abo/org-download][hier]]
+#+begin_src elisp
+(use-package org-download
+  :ensure t
+  ;; Optional: Setze org-download nach dem Laden automatisch für org-mode und dired
+  :hook ((org-mode dired-mode) . org-download-enable))
+
+(setq-default org-download-image-dir "~/cloud/life/zeit/void/org-download")
+(setq-default org-download-screenshot-method "flameshot gui --raw > %s")
+(setq-default org-download-heading-lvl nil) ;falls ich das nicht habe wird ein Ordner erstellt mit dem Namen des Headers unter den das Bild eingefügt wird - so kommt kein zusätzlicher Ordner
+(setq-default org-download-timestamp "%Y-%m-%d-%H%M%S-")
+;; (setq org-download-display-inline-images nil) ;hiermit wird das Bild nur eingefügt aber nicht angezeigt
+
+#+end_src
+
+** Drill/Flashcards/Learningcard in Emacs
+Anwendungsbeispiele: [[Anwednungs][hier]]
+#+begin_src elisp
+(use-package org-drill
+  :ensure t
+  :after org
+  :config
+  ;; Konfiguration für org-drill, falls erforderlich
+)
+#+end_src
+*** Frage 1 :drill:
+:PROPERTIES:
+:ID:       41471781-b5ea-45bb-a344-6b8f90607bfb
+:END:
+Was geht ab Mane
+**** Die Antwort
+Nothing special ;)
+
+** Export
+*** Latex
+*** reveal
+https://github.com/yjwen/org-reveal/
+** Keybinds
+#+begin_src elisp
+(with-eval-after-load 'org
+  ;; Standardmäßig kann ich mit Alt bzw. Shift + Pfeiltasten Zellen/Zeilen/Spalten einer Tabelle easy verschieben! Hier nun noch ein paar nützliche Keybindings um Trennlinien, neue Zeilen/Spalten einzufügen/löschen
+  (define-key org-mode-map (kbd "M-j") #'org-table-insert-row)
+  (define-key org-mode-map (kbd "M-k") #'org-table-insert-hline)
+  (define-key org-mode-map (kbd "M-l") #'org-table-insert-column)
+  (define-key org-mode-map (kbd "M-H") #'org-table-delete-column)
+  (define-key org-mode-map (kbd "M-J") #'org-table-kill-row)
+  (define-key org-mode-map (kbd "M-t") #'org-clock-in)
+  (define-key org-mode-map (kbd "M-T") #'org-clock-out)
+  (define-key org-mode-map (kbd "M-r") #'org-clock-report)  ;; Fügt einen time tracking block ein für den Fall dass ich mit Clock Time (clock in und clock out die Arbeitszeit an einem Heading arbeite!)
+  (define-key org-mode-map (kbd "M-m") #'mane-presentation-mode)
+  (define-key org-mode-map (kbd "M-M") #'mane-writing-mode)
+  (define-key org-mode-map (kbd "M-+") #'logos-narrow-dwim)
+  (define-key org-mode-map (kbd "M-<") #'logos-backward-page-dwim)
+  (define-key org-mode-map (kbd "M--") #'logos-forward-page-dwim)
+)
+#+end_src
+
+** Open Links with Programm
+#+begin_src elisp
+(use-package openwith
+  ;; :after-call pre-command-hook
+  :config
+  (setq openwith-associations
+        '(("\\.pdf\\'" "zathura" (file))
+	      ("\\.\\(jpg\\|png\\|gif\\|jpeg\\)\\'" "viewnior" (file))
+          ("\\.\\(docx\\|odt\\|xlsx\\|doc\\)\\'" "onlyoffice-desktopeditors" (file))
+          ("\\.\\(mp3\\|mp4\\|mpeg\\|mkv\\)\\'" "vlc" (file))
+          ("\\.\\(md\\)\\'" "obsidian" (file))
+	  ))
+  (openwith-mode +1))
+#+end_src
+
+** Roam
+-#+begin_src elisp- Ist schon ein geiles Paket, aber denote ist simpler und ich glaube etwas besser durchdacht mit weniger Schnickschnack, sodass ich aktuell zumindest mal die Benennung von denote verwende, da die ähnlich zu dem ist wie ich es ohnehin vor hatte.
+#+begin_src elisp
+;; (use-package org-roam
+;;   :ensure t
+;;   :custom
+;;   (org-roam-directory "~/cloud/life/raum/pkb")
+;;   (org-roam-db-autosync-mode t)
+;;   :config
+;;   (setq org-roam-ui-sync-theme t
+;;         org-roam-ui-follow t
+;;         org-roam-ui-update-on-save t
+;;         org-roam-ui-open-on-start t)
+;;   (setq org-roam-capture-templates
+;;         '(("b" "book notes" plain (file "~/cloud/life/raum/pkb/material/template-roam-capture-book.org")
+;;            :if-new (file+head "%<%Y%m%d>-${slug}.org" "#+title: ${title}\n")
+;;            :unnarrowed t)
+;;           ("n" "normal/einfach nur mit Datum" plain (file "~/cloud/life/raum/pkb/material/template-roam-capture-normal.org")
+;;            :if-new (file+head "%<%Y%m%d>-${slug}.org" "#+title: ${title}\n")
+;;            :unnarrowed t)))
+;;   :hook
+;;   (after-init . org-roam-db-sync))
+
+;; (use-package org-roam-ui
+;;   :after org-roam ;; Stellt sicher, dass org-roam-ui nach org-roam geladen wird
+;;   :config
+;;   (setq org-roam-ui-sync-theme t
+;;         org-roam-ui-follow t
+;;         org-roam-ui-update-on-save t
+;;         org-roam-ui-open-on-start t))
+#+end_src
+
+** Minor-Modes (Schreibmodus & Präsentationsmodus)
+- Schriftart und Spacing mit Fontaine und Spacious-Padding sind im Unterpunkt Erscheinungsbild festgelegt und können dort angepasst werden
+- Keybinds zum togglen unter org-mode keybindings eingerichtet ("M-m" oder "M-M" zusammen mit "M-+" "M--" "M-<")
+#+begin_src elisp
+;; Modeline weniger nervig machen benötigt folgendes Paket
+(use-package hide-mode-line
+  :ensure t)
+
+;; Um im Präsentationsmodus auf einen Punkt zu fokussieren und mit keybinding zur nächsten Folie zu wechseln benötigt folgendes Paket
+(use-package logos
+  :ensure t
+  :custom
+  (logos-outlines-are-pages t))
+
+(use-package focus
+  :ensure t) ;dimmt Text der nicht in der aktuellen Zeile sichtbar ist!
+
+;; Variable die mir beim Umschalten zwischen normalem und Schreibmodus hilft
+(defvar mane-writing-mode-active nil "Speichert den aktuellen Zustand des Schreib- und Präsentationsmodus.")
+#+end_src
+*** Schreibmodus
+#+begin_src elisp
+(defun mane-writing-mode ()
+  "Toggle the writing mode."
+  (interactive)
+  (if mane-writing-mode-active
+      (progn
+        ;; Deaktivieren
+        (setq mane-writing-mode-active nil)
+        (message "Schreibmodus deaktiviert."))
+    ;; Aktivieren
+    (setq mane-writing-mode-active t)
+    (message "Schreibmodus aktiviert."))
+  ;; Modi für alle org-mode Buffers umschalten
+  (dolist (buf (buffer-list))
+    (with-current-buffer buf
+      (when (derived-mode-p 'org-mode)
+        (if mane-writing-mode-active
+            (progn
+              (focus-mode 1)
+              (logos-narrow-dwim))
+          (focus-mode -1)
+          ;; Rufen Sie logos-narrow-dwim erneut auf, wenn nötig, um den Effekt rückgängig zu machen
+          ))))
+  ;; Weitere Aktionen, die für beide Zustände gelten
+  (if mane-writing-mode-active
+      (progn
+        ;; Aktionen bei Aktivierung
+        (feebleline-mode -1)
+        (hide-mode-line-mode 1)
+        (spacious-padding-mode 1)
+        (variable-pitch-mode 1)
+        (fontaine-set-preset 'write))
+    ;; Aktionen bei Deaktivierung
+    (feebleline-mode 1)
+    (spacious-padding-mode -1)
+    (variable-pitch-mode -1)
+    (fontaine-set-preset 'regular))
+  ;; Aktuellen Buffer automatisch neu laden
+  (revert-buffer :ignore-auto :noconfirm))
+#+end_src
+*** Präsentationsmodus
+#+begin_src elisp
+(defun mane-presentation-mode ()
+  "Aktivieren oder Deaktivieren des Präsentationsmodus."
+  (interactive)
+  (if mane-writing-mode-active
+      ;; Wenn der Modus bereits aktiv ist, deaktivieren
+      (progn
+        (feebleline-mode 1)
+        (spacious-padding-mode -1)
+	      (variable-pitch-mode -1)
+        (fontaine-set-preset 'regular) ;; Zurück zu den Standard-Einstellungen
+        ;; Weitere Modi deaktivieren
+        (dolist (buf (buffer-list))
+          (with-current-buffer buf
+            (when (derived-mode-p 'org-mode)
+              ;; (logos-focus-mode -1)
+	      )))
+        (setq mane-writing-mode-active nil)
+        (message "Präsentationsmodus deaktiviert."))
+    ;; Modus aktivieren
+    (progn
+      (feebleline-mode -1)
+      (hide-mode-line-mode 1)
+      (spacious-padding-mode 1)
+      (variable-pitch-mode 1)
+      (fontaine-set-preset 'pres) ;; Zum Präsentations-Setup wechseln
+      ;; Weitere Modi aktivieren
+      (dolist (buf (buffer-list))
+        (with-current-buffer buf
+          (when (derived-mode-p 'org-mode)
+            ;; (logos-focus-mode 1)
+	    )))
+      (setq mane-writing-mode-active t)
+      (message "Präsentationsmodus aktiviert."))))
+#+end_src
+** Settings
+- Bei den Einstellungen hier eventuell darauf achten ob es bei init ~:after org~, also nach dem Laden von org-mode initial gesetzt werden, oder ob es Teil der :config ist!
+- Verschlüsselung von kompletten Dateien geht standardmäßig easy mit dired und dem integriertem epa (siehe dired), aber wenn ich einzelne Abschnitte in einer .org verschlüsseln will kann ich dies ebenfalls mit <M-x org-encrypt-entry> und <M-x org-encrypt-entry> und hierfür habe ich hier noch zusätzliche konfigurationen vorgenommen.
+- siehe auch Paket crypt++
+#+begin_src elisp
+(org-crypt-use-before-save-magic) ;; Aktiviert die automatische Verschlüsselung vor dem Speichern
+(setq org-directory "~/cloud/life/raum/pkm/"
+      org-log-into-drawer 1                  ;Notes mit <C-c C-z> werden direkt in den Drawer :LOGBOOK: geschrieben wenn dieser vorhanden ist
+      org-startup-folded 'show3levels        ;beim Start werden Header bis zum 3 Level angezeigt
+      org-publish-use-timestamps-flag nil    ;exportiert alles - macht Export leichter nachzuvollziehen
+      org-export-with-broken-links t         ;macht auch einen Export wenn nicht alles passt - sometimes better than nothing
+      org-edit-src-content-indentation 0     ;set src block automatic indent to 0 instead of 2.
+      org-crypt-hide-echo-area nil ;; Blendet die Echo-Area beim Verschlüsseln nicht aus
+      org-tags-exclude-from-inheritance (quote ("crypt")) ;; Verhindert, dass der "crypt"-Tag an untergeordnete Elemente vererbt wird
+      org-crypt-key "5AAD62293D61A89D" ;;GPG key to use for encryption. - kann statt t auch den Fingerabdruck angeben der standardmäßig verwendet werden soll. nil means  use symmetric encryption unconditionally. "" means use symmetric encryption unless heading sets CRYPTKEY property.
+      ;; org-log-done 'time
+      ;; delete-by-moving-to-trash t     ;oder 'move-file-to-trash t'??
+      ;; trash-directory "~/.papierkorb/" ;muss den Ordner manuell erstellen in Windows? Wenn etwas aus diesem Ordner gelöscht wird geht es glaub in den Systemtrash - also dann nicht mehr mein Papierkorb
+        ;; org-journal-dir "~/cloud/life/raum/.org/"
+      ;; org-journal-date-format "%B %d, %Y (%A) "
+      ;; org-journal-file-format "%Y-%m-%d.org"
+      ;; org-tag-alist (quote ((:startgroup) ("@Work" . ?w) ("@Home" . ?h) ("@Projekt" . ?p) ("@Ökonomie" . ?o) ("@Gesundheit" . ?g)       ;@ macht es zu mutual exclusiv tags die weggehen wenn anderer tag eingestellt wird
+                            ;; (:endgroup) ("noexport" . ?n) ("Mane" . ?M) ("Joana" . ?J) ("Schule" . ?S)))
+      ;; org-capture-templates '(("1" "TODO" entry (file+headline "~/cloud/life/raum/.org/home.org" "Aufgaben")"** %? [/] \n %a")
+                              ;; ("2" "Einkaufsliste" checkitem (file+headline "~/cloud/life/raum/.org/home.org" "Einkaufsliste"))
+                              ;; ("3" "Wunschliste" checkitem (file+headline "~/cloud/life/raum/.org/home.org" "Wunschliste"))
+                              ;; ("4" "Neue Abrechnung" table-line (file+headline "~/cloud/life/raum/.org/work.org" "Abrechnungen Jo"))
+                              ;; ("a" "Appointment" entry (file  "~/cloud/life/raum/.org/gcal.org") "* %?\n\n%^T\n\n:PROPERTIES:\n\n:END:\n\n")
+                              ;; ("j" "Daily Journal" entry (file+olp+datetree "~/cloud/life/raum/.org/home.org" "Journal") "* %^{Description}      Hinzugefügt am: %U      %^g\n%?"))))
+)
+
+
+(org-babel-do-load-languages
+ 'org-babel-load-languages
+ '((shell . t)  ;; Stelle sicher, dass Shell unterstützt wird
+   (python . t))) ;; Stelle sicher, dass Python unterstützt wird
+
+;; The following prevents <> from auto-pairing when electric-pair-mode is on.
+;; Otherwise, org-tempo is broken when you try to <s TAB...
+(add-hook 'org-mode-hook (lambda ()
+           (setq-local electric-pair-inhibit-predicate
+                   `(lambda (c)
+                  (if (char-equal c ?<) t (,electric-pair-inhibit-predicate c))))))
+#+end_src
+** Table of Contents
+#+begin_src elisp
+(use-package toc-org
+    :commands toc-org-enable
+    :init (add-hook 'org-mode-hook 'toc-org-enable))
+#+end_src
+** Tables
+- Video zu [[https://www.youtube.com/watch?v=JesPNdMS4Ik][orgtbl-aggregate]] und [[https://github.com/tbanel/orgaggregate/tree/master][github]]
+- Um Tabellen schöner darzustellen verwende ich aktuell [[https://github.com/Fuco1/org-pretty-table/tree/master][org-pretty-table]]
+- Mit <C-c Tab> kann ich eine Spalte manuell ein/ausblenden
+#+begin_src elisp
+(use-package orgtbl-aggregate
+  :ensure t
+  :after org
+  :config
+  ;; Konfiguration für orgtbl-aggregate, falls erforderlich
+)
+; folgendes brauche ich nur wenn ich unter Erscheinungsbild org-modern nicht verwende, denn dieses Paket kümmert sich automatisch auch um Tabellen, weshalb ich es hier vorerst deaktiviert habe
+;; (use-package org-pretty-table
+  ;; :ensure t
+  ;; '(org-pretty-table :host github :repo "Fuco1/org-pretty-table")
+  ;; :config
+  ;; (global-org-pretty-table-mode t)
+;; )
+#+end_src
+** Transclusion
+https://github.com/nobiot/org-transclusion
+https://www.youtube.com/watch?v=ueaPiA622wA&t=327s
+Beispiel hier: Mit <SPC t t> Transclusion aktivieren/deaktivieren
+
+#+transclude: [[~/.config/emacs/config.org::Transclusion]] :lines 1-5 :src elisp
+
+#+begin_src elisp 
+(use-package org-transclusion
+  :after org)
+#+end_src
+#+end_src
+* Passwörter
+Das Paket password-store ist bisher nicht nativ in Emacs. Es kann für die Integration von dem Passwortmanager pass (Unix-Tool) verwendet werden. Das password-store Paket in Emacs ermöglicht es Benutzern, auf ihre Passwörter zuzugreifen und sie innerhalb von Emacs zu verwenden, was eine nahtlose Integration in den Workflow bietet.
+#+begin_src elisp
+(use-package password-store
+  :ensure t
+  :config
+  ;; Hier können Sie weitere Konfigurationen vornehmen, z.B. Tastenkombinationen festlegen
+  )
+#+end_src
+* PDF-Tools
+#+begin_src elisp
+(use-package pdf-tools
+  :ensure t
+  :config
+  (pdf-tools-install))
+#+end_src
+* Safe Undo Redo Yank
+- Aktuell so konfiguriert, dass die Dateien im Papierkob meiner Cloud landen! Alternativ sollte ich es so konfigurieren, dass sie in ~/.local/share/files/ landen!
+- Ich werde aktuell nicht mehr gefragt ob ich etwas speichern will, aber alle ungespeicherten Änderungen bleiben solange ich den daemon nicht kille mit ~killall emacs~ erhalten. Ich kann also einen neuen Client öffnen und dann speichern. Wenn ich Emacs mit <C-x C-c> schließe werde ich dank der Funktion hier auch gefragt ob ich etwas ungespeichertes speichern will. Sollte ich vergessen etwas zu speichern und den daemon killen, dann wird eine Backup Datei vom Autosafe erstellt wo die Änderungen noch enthalten sind, aber der ungespeicherte Fortschritt ist im nächsten Client dann nicht mehr sichtbar und kann dort somit später nicht noch gespeichert werden. Da ich es mir ganz gut angewöhnt habe wichtige Änderungen zu speichern ist es auf diese Art sinnvoll, da unbeabsichtigte Speicherprozesse nicht passieren, aber kann schon sein, dass dann mal was nicht gespeichert wird und es mir auch nicht auffällt!!! Eventuell bekomme ich es daher noch hin auch eine Nachfrage im Buffer zu erhalten, ob der Client geschlossen werden soll mit oder ohne zu speichern wenn ich den Client nicht mit <C-x C-c> sondern über Qtile schließe!
+- Undo Tree vll nicht das geilste Werkzeug und Git zusammen mit autosafe und der git timemachine die bessere Version Control!
+
+- (undo +tree)              ; persistent, smarter undo for your inevitable mistakes
+#+begin_src elisp
+(defun confirm-save-buffers-then-kill-emacs ()
+  "Fragt nach dem Speichern von Buffern, dann ob Emacs wirklich geschlossen werden soll."
+  (interactive)
+  (if (save-some-buffers nil t) ; Änderungen wurden gespeichert oder keine Änderungen vorhanden.
+      (when (yes-or-no-p "Emacs wirklich schließen? ")
+        (kill-emacs))
+    (when (yes-or-no-p "Ungespeicherte Änderungen vorhanden. Emacs dennoch schließen? ")
+      (kill-emacs))))
+
+(setq confirm-kill-emacs 'confirm-save-buffers-then-kill-emacs)
+
+(defun copy-current-path-to-clipboard ()
+  "Kopiert den Pfad der im aktuellen Buffer geöffneten Datei oder des aktuellen Dired-Verzeichnisses in die Zwischenablage."
+  (interactive)
+  (let ((path (if (equal major-mode 'dired-mode)
+                  (dired-current-directory)
+                (buffer-file-name))))
+    (if path
+        (progn
+          (kill-new path)
+          (message "Kopiert: %s" path))
+      (message "Kein Pfad verfügbar!"))))
+;; Installieren und konfigurieren von undo-tree
+(use-package undo-tree
+  :ensure t
+  :config
+  (global-undo-tree-mode)
+  ;; Konfiguration für undo-tree
+  (setq undo-tree-auto-save-history t
+        undo-tree-history-directory-alist '(("." . "/home/flowmis/cloud/life/zeit/papierkorb/emacs/undo-tree"))
+        save-interprogram-paste-before-kill t) ;;Wenn auf t gesetzt, speichert Emacs Inhalte, die außerhalb von Emacs kopiert wurden, im Kill Ring. Dies ist nützlich, wenn Sie etwas kopieren, dann innerhalb von Emacs etwas löschen und schließlich das zuvor kopierte Element einfügen möchten, ohne es zu verlieren.
+)
+#+end_src
+* Search, Grep, Ediff,...
+- Simple Suche mit i-search (in Emacs integriert) -> oft hilfreich für Navigation, da es nicht so viele unnötige treffer anzeigt und nur das findet was wirklich eingegeben wird!
+- Imenu hilft schnell Headings/Sections in großen Dateien zu finden (imenu ist bereits vorhanden, aber habe imenu-list installiert + Keybinding <SPC s>)
+- Ediff: MIt <M-x ediff-files> (Wenn ich die Buffer bereits offen habe kann ich <M-x ediff-files> verwenden was ansonsten gleich ist außer dass ich die Dtaeien nicht auswählen muss) -> Auswahl der Dateien und dann über Keybinds navigieren und Änderungen machen (? drücken um das Controlpanel zu sehen von dem aus die Keybinds gedrückt werden -> n = next diff,...) <- zuerst gewählte Datei ist Datei A und als zweites gewählte Datei ist Datei B und somit kann ich mit a den inhalt von a auf b übertragen und mit b den Inhalt von b nach a übertragen! Bei Fehlern kann ich einfach in die Datei gehen es rückgängig machen und wieder in das Contorlpanel und dort previous und next und ich bin wieder dort wo ich zuvor die falsche Änderung vorgenommen habe.
+  - In Magit sehr hilfreich: Recent Commits mit Maus markieren + e (Ediff dwim) -> in den markierten Committs kann ich mir nun eine Datei auswählen und schauen wie sich diese von unterstem bis oberstem ausgewählten Commit verändert hat! Super nice wenn man mal mehrere Commits zurück muss weil etwas nicht mehr funktioniert!
+- isearch: Mit <M-n> oder <M-p> kann ich zwischen vorherigen Sucheingaben wechseln 2x isearch aufrufen <C-s C-s> wiederholt die letzte Suche und mit <C-r> kann man rückwerts suchen! Mit <C-M s> kann ich isearch mit regex nutzen
+- Mit occur <M-s o> kann ich regexp einer Anfrage in seperatem Buffer öffnen - auch sehr hilfreich wenn ich zwischen den vorkommenden Stellen hin und her springen will kann ich den occur buffer hierfür nutzen (in ihm kann ich mit n und p navigieren um zu den Stellen im anderen Buffer zu springen) <- Mit e kann ich in occur-edit-mode wechseln und Änderungen direkt dort durchführen!
+- Diredsuche: Mit <M-x dired-mark-files-regexp> (dann t um alle anderen zu markieren und k um diese im Buffer auszublenden) -> so findet man zusammen mit nameing scheme schnell alle Dateien!
+- Ripgrep (rg): ~sudo pacman -S ripgrep~ Ist das beste aus grep und silversearcher tool (A search tool that combines the usability of ag with the raw speed of grep) -> Vorgehen ansonsten gleich wie bei Grep. Mit dem Paket wgrep kann ich den grep Buffer editierbar machen und so über mehrere Dateien hinweg gleichzeitig Änderungen vornehmen!
+  1. Mit dired an den Ort gehen 
+  2. <M-x rg> Suche starten 
+  3. In dem Buffer meine Funktion starten und damit zu wgrep und in den inser modus wechseln
+  4. Mit query replace oder manuelle Änderungen vornehmen 
+  5. <C-c C-c> Speichern und anwenden der Änderungen
+
+#+begin_src elisp
+(setq ediff-split-window-function 'split-window-horizontally  ;splits are side by side
+      ediff-window-setup-function 'ediff-setup-windows-plain) ;Control Panel ist direkt unterhalb der Buffer
+
+(setq search-whitespace-regexp ".*?") ;erlaubt isearch der Suche Buchstaben etc. zwischen zwei Wörtern zu überspringen, sodass ich wenige Buchstaben eines Worts Leertaste und den Beginn des zweiten Worts tippen kann um an eine Stelle zu springen 
+
+(defun mane-change-to-wgrep-and-evil-insert ()
+  "Wechselt zu wgrep-Modus und aktiviert dann den evil-insert-Modus."
+  (interactive)
+  (wgrep-change-to-wgrep-mode)
+  ;; wgrep-Modus braucht genug Zeit, bevor wir versuchen, in den evil-insert-Modus zu wechseln.
+  (run-with-idle-timer 0.1 nil (lambda () (evil-insert 1))))
+
+(use-package wgrep
+  :ensure t
+  :config
+  (setq wgrep-auto-save-buffer t))   ; Automatisches Speichern wenn ich die Änderungen mit C-c C-c bestätige
+
+(use-package rg
+  :ensure t)
+
+(use-package imenu-list
+  :ensure t
+  :bind ("C-'" . imenu-list-smart-toggle)
+  :config
+  (setq imenu-list-focus-after-activation t))
+#+end_src  
+
+* Snippets/Abbrev
+Statt yasnippets verwende ich die eingebauten Abbrev (abbreviation = Abkürzung) -> Infos [[https://www.youtube.com/watch?v=ruPpRlh2re4][hier]]
+#+begin_src elisp
+;; (use-package yasnippet
+  ;; :config
+  ;; (setq yas-snippet-dirs '("~/cloud/life/raum/pkb/material/yasnippets/"))
+  ;; (yas-global-mode 1))
+
+;;Abbrev Tables kann ich für unterschiedliche mode erstellen (sind mehrere aktiv wie in org mode wo text-mode und org-mode aktiv sind, wird bei einem Konflikt der lokalere genommen, also im Falle von org-mode die org-abbrev-table, da die text-abbrev-table hier weiter entfernt bzw. weiter unten und somit grundlegender liegt, aber bei keinem Konflikt funktioniert auch die text-abbrev-table in .org Dateien). ACHTUNG: SONDERZEICHEN FUNKTIONIEREN NUR MIT SPEZIELLER KONFIGURATION (REGEXP)!
+;;org-mode -> braucht einen hook für den org-mode
+(define-abbrev org-mode-abbrev-table "expres" "" 'mane-abbrev-expansion-1) ;; < sollte ich nicht als Zeichen wählen denn dann funktioniert es nicht!
+(define-abbrev org-mode-abbrev-table "exsvp" "" 'mane-abbrev-expansion-2)
+;;text-mode -> braucht einen hook für den text-mode
+(define-abbrev text-mode-abbrev-table "exa4" "" 'mane-abbrev-expansion-3)
+(define-abbrev text-mode-abbrev-table "exporthead" "#+export_file_name: /home/flowmis/cloud/life/zeit/void/export/")
+;;global-mode -> braucht einen hook für den global-mode
+(define-abbrev global-abbrev-table "timein" "" 'mane-current-time)
+;;text-mode und org-mode machen Sinn und wenn diese nicht aktiv sind ist man in der Regel im prog-mode (Programmiermodus) -> aktuell programmier ich zu wenig um es sinnvoll einzurichten!
+
+;; (add-hook 'org-mode-hook 'mane-add-org-abbrevs)
+(add-hook 'org-mode-hook 'abbrev-mode)
+(add-hook 'text-mode-hook 'abbrev-mode)
+;; (add-hook 'global-mode-hook 'abbrev-mode) ;; Sollte man eher vermeiden, da es zu unspezifisch ist und Probleme verursachen kann
+
+;; Funktionen erlauben abbrev deutlich dynamischer und Funktionaler zu werden!
+(defun mane-current-time ()
+  (insert (format-time-string "%T")))
+
+(defun mane-abbrev-expansion-1 ()
+  "Fügt die Exporteinstellungen für eine Präsentation ein."
+  (interactive)
+  (insert "#+SETUPFILE: ~/cloud/life/zeit/void/latex/vorlage-pres-chem.org\n#+LATEX_HEADER: \\input{~/cloud/life/zeit/void/latex/zusatz-pres-chem.tex}\n# #+SETUPFILE: ~/cloud/life/zeit/void/latex/vorlage-pres-spo.org\n# #+LATEX_HEADER: \\input{~/cloud/life/zeit/void/latex/zusatz-pres-spo.tex}\n#+OPTIONS: author:nil date:nil title:nil num:nil toc:nil tags:nil d:nil\n\\maketitle\n"))
+
+(defun mane-abbrev-expansion-2 ()
+  "Fügt die Exporteinstellungen für einen svp ein."
+  (interactive)
+  (insert "#+SETUPFILE: ~/cloud/life/zeit/void/latex/vorlage-svp-chem.org\n# #+SETUPFILE: ~/cloud/life/zeit/void/latex/vorlage-svp-spo.org\n# #+LATEX_HEADER: \\input{~/cloud/life/zeit/void/latex/zusatz-eigene-farben.tex}\n#+OPTIONS: author:nil date:nil title:nil num:nil toc:nil tags:nil d:nil\n#+LaTeX_HEADER: \\pagestyle{fancy}\n#+LaTeX_HEADER: \\fancyhf{}\n#+LaTeX_HEADER: \\renewcommand{\\headrulewidth}{0pt}\n#+LaTeX_HEADER: \\fancyhead[R]{Datum: \\today}\n#+LaTeX_HEADER: \\fancyhead[L]{Hoffmann Markus}\n#+LaTeX_HEADER: \\fancyhead[C]{Stundenverlaufsplan Klasse }"))
+
+(defun mane-abbrev-expansion-3 ()
+  "Fügt die Exporteinstellungen für einen A4 ein."
+  (interactive)
+  (insert "#+SETUPFILE: ~/cloud/life/zeit/void/latex/vorlage-ab.org\n# #+SETUPFILE: ~/cloud/life/zeit/void/latex/vorlage-ib.org\n# #+SETUPFILE: ~/cloud/life/zeit/void/latex/vorlage-a4.org\n#+LATEX_HEADER: \\input{~/cloud/life/zeit/void/latex/zusatz-eigene-farben.tex}\n#+LaTeX_HEADER: \\fancyhead[L]{Arbeitsblatt Klasse }\n#+OPTIONS: author:nil date:nil title:nil num:nil toc:nil tags:nil d:nil\n# #+LaTeX_HEADER: \\usepackage{setspace}\n# #+LaTeX_HEADER: \\fancyfoot[C]{\\tiny \\uline{Strukturformel:} \\hspace{.6cm}\\raisebox{-0.5\\height}{\\includegraphics[height=12ex]{~/cloud/life/zeit/void/latex/material/atom.png}} \\hspace{.6cm} \\uline{Funktionelle Gruppe:} \\hspace{3cm} \\uline{Name der Strukturformel:} \\hspace{3cm}}\n# \\input{~/cloud/life/zeit/void/latex/seite-zum-einfügen-praktikum-chemie.org} # input geht überall auch vor Haupttext und danach, während \\include nur im Haupttext funktioniert -> immer input nutzen statt include -> mit diesem Befehl kann man ein großes Latex Document aus mehreren Dateien (ob latex oder org ist egal) zusammenbauen -> Hilfreich wenn man Disclaimer oder bestimmte Standardfolien hat die man immer wieder irgendwo einbauen möchte (Titelseite, Begrüßung, Sicherheitshinweise, Standardrklärungen, Copyright, Zertifikate...)"))
+#+end_src
+- more infos: https://github.com/joaotavora/yasnippet
+- Ermöglicht das automatische erstellen häufig verwendeter Blöcke
+- scheint mir als wären yasnippet ind doom emacs bereits vorinstalliert
+- In meine config folgendes snippet hinzufügen und (package! yasnippet) in packages.el ergänzen
+- weitere Infos: https://www.youtube.com/watch?v=W-bRZlseNm0&t=303s
+- Meine Snippets mit folgenden Keys + Tab einfach automatisch einfügen
+  | Key  | Link | Was es macht                                                               |
+  |------+------+----------------------------------------------------------------------------|
+  | <ss  |      | SourceCodeBlock - Standard                                                 |
+  | <smh |      | SourceCodeBlock - Mermaid html Export                                      |
+  | <smg |      | SourceCodeBlock - Mermaid Github Export                                    |
+  | <sl  |      | SourceCodeBlock - Latex Gleichung                                          |
+  | <sp  |      | SourceCodeBlock - Python (print Befehle werden als Ausgabe angezeigt etc.) |
+  | <pc  |      | Python Class                                                               |
+  | <wo  |      | Header für den HTML Export mit online Stylesheets etc.                     |
+  | <wl  |      | Header für den HTML Export mit lokalen Stylesheets etc.                    |
+  | <l   |      | Link + Linkname                                                            |
+  | <p   |      | Präsentationseinstellungen für org-tree-slide                              |
+  | <a   |      | Header um Archive file einfügen                                            |
+  | <b   |      | Bild mit Bildunterschrift und einstellbarer Größe                          |
+- auto yasnippets sind ebenfalls coole Sache und mittlerweile in Doom bei normalen yasnippets automatisch dabei - sinnvoll für Snippets die man nicht dauerhaft speichern will:
+  - <M-x aya> zeigt die Möglichkeiten an
+  - Wichtigste ist <M-x aya-create> und <M-x aya-expand> -> Eventuell noch ein Keybinding für diese festlegen
+  - Auch gut beim Programmieren!
+  - Beispiel:
+   - Nach ausführen von <M-x aya-create> in Zeile sollten die ~ verschwinden und beim einfügen von <M-x aya-expand> kann man an diese Stelle nun schreiben und alle mit ~ gekennzeichneten Variablen die gleich heißen werden dann mit angepasst -> Cool wenn man Emails schreiben will etc.
+   Hier die beiden Befehle testen
+   In Zeile unter dieser <M-x aya-create> ausführen (muss nicht markiert sein und auch egal wo in der Zeile):
+   Hi ~Name, ~MailText   Mit freundlichen an ~Name Grüßen Markus
+   Unterhalb dieser Zeile <M-x aya-expand> ausführen und Variablen eingeben:
+
+* Which-Key
+Hilfe welche Keys ich als Nächstes drücken kann bzw. welche Keybidings vergeben wurden.
+#+begin_src elisp
+(use-package which-key
+  :init
+    (which-key-mode 1)
+  :config
+  (setq which-key-side-window-location 'bottom
+	  which-key-sort-order #'which-key-key-order
+	  which-key-allow-imprecise-window-fit nil
+	  which-key-sort-uppercase-first nil
+	  which-key-add-column-padding 1
+	  which-key-max-display-columns nil
+	  which-key-min-display-lines 6
+	  which-key-side-window-slot -10
+	  which-key-side-window-max-height 0.25
+	  which-key-idle-delay 0.8
+	  which-key-max-description-length 25
+	  which-key-allow-imprecise-window-fit nil
+	  which-key-separator " → "))
+#+end_src
+* Workspaces, Register & Bookmarks
+- [[https://www.youtube.com/watch?v=7eWAfmABHMs&list=WL&index=22][Bookmarks]] (hilfreich auch für Makros und eine Präsentation um zu stellen zu springen)
+  - Bookmark erstellen: <C-x r m> <M-x bookmark-set>
+  - Bookmark öffnen: <C-x r b> <M-x bookmark-jump>
+- Ich verwende [[https://github.com/alphapapa/burly.el][burly]], da es minimalisitsch, einfach und icht in Konflikt mit meinem App-Launcher ist. Alternative die leider meinen App-Launcher unnutzbar macht, sodass ich (rofi oder cerebro nutzen müsste) ist [[https://github.com/nex3/perspective-el][perspective]]. Auch ein ähnliches Paket ist [[https://depp.brause.cc/eyebrowse/][eyebrowse]].
+  
+#+begin_src elisp
+(use-package burly)
+#+end_src
+* TODO Zitieren mit org-ref
+
+ICH SOLLTE NOCH EIN ABBREV HIERFÜR ERSTELLEN UND AM BESTEN SCHAUEN, DASS AUCH DER EXPORT MEINER PRÄSENTATIONS-PDFS AUF DIE GLEICHE WEISE KLAPPT. ZUDEM MUSS ICH MEIN BEISPIEL NOCH VERBESSERN IN BEZUG AUF TABELLEN ETC. SODASS ICH EIN PARADEBEISPIEL HABE FÜR DIE NUTZUNG! -> [[denote:20240214T164450][Bachelorarbeit]] 
+
+- Zu meiner config brauche ich die LatexPakete hier speziell brauche ich biber um die Bibliographiepfade etc. richtig aufzulösen. -> ~sudo pacman -S texlive-core biber texlive-binextra~
+- Da ich mehrmals kompilieren muss um die Referenzen und das Literaturverzeichnis richtig angezeigt zu bekommen, muss ich dies in meiner config unter =org-latex-pdf-process= festlegen. Das geht allerdings dann nur automatisch wenn ich die pdf vor Ort erstelle und keinen Exportpfad festlege in der .org Datei! Manuell kann ich auch kompilieren in dieser Reihenfolge indem ich zu der Datei navigiere und dann folgendes durchführe:
+  1. pdflatex test.tex 
+  2. biber test 
+  3. pdflatex test.tex 
+  4. pdflatex test.tex 
+- Zusätzlich muss ich über latex header einige Änderungen in der Datei vornehmen dass das herauskommt was ich möchte: Beispielsweise die folgenden Header(alles weitere siehe test.org): #+LATEX_HEADER: \usepackage[backend=biber,style=apa]{biblatex}  &  #+LATEX_HEADER: \addbibresource{/home/flowmis/cloud/life/raum/pkb/literatur/20240214T175059==mh--literatur-sammlung__pkb.bib}
+- Mit [cite:@schlüssel] kann ich dann ein Referenz einfügen (Keybinding: <SPC R l>). Schlüssel ist das was in der .bib als erstes kommt.
+
+#+begin_src elisp
+(use-package org-ref
+  :ensure t
+  :after org
+  :init
+  (setq reftex-default-bibliography '("/home/flowmis/cloud/life/raum/pkb/literatur/20240214T175059==mh--literatur-sammlung__pkb.bib") ;Für Export zu Latex wichtig! Diese Einstellung definiert einen oder mehrere Pfade zu deinen BibTeX-Bibliografiedateien. RefTeX ist ein integriertes Paket in Emacs, das zusammen mit org-ref zur Verwaltung von Literaturverweisen verwendet wird. Diese Dateien enthalten deine Literaturdatenbank im BibTeX-Format. Wenn du in einem Dokument auf ein Werk verweisen möchtest, sucht RefTeX in diesen Dateien nach den entsprechenden Einträgen. 
+        org-ref-bibliography-notes "/home/flowmis/cloud/life/raum/pkb/literatur/20240214T132208==mh--notizen-literatur__h_pkb_w.org" ;Wenn ich in einer .bib bin und dort auf einem Eintrag kann ich die Funktion <M-x org-ref-open-bibtex-notes> ausführen und springe dadurch zu dieser hier angegebenen Datei und dort befinden sich meine Notizen bzw. falls nicht wird ein Header für den entsprechenden bibtex eintrag erstellt!
+        org-ref-default-bibliography '("/home/flowmis/cloud/life/raum/pkb/literatur/20240214T175059==mh--literatur-sammlung__pkb.bib") ;Für die Funktionalität von org-ref wichtig! Ähnlich wie reftex-default-bibliography legt diese Einstellung den oder die Standardpfade zu deinen BibTeX-Bibliografiedateien für org-ref fest. Diese Dateien werden verwendet, um Literaturverweise in deinen Org-Dokumenten zu suchen und einzufügen.
+        org-ref-pdf-directory "/home/flowmis/cloud/life/raum/pkb/literatur/") ;Diese Einstellung gibt den Speicherort an, an dem die PDF-Dateien deiner Literaturquellen gespeichert sind. org-ref kann diese PDFs direkt aus dem Org-Dokument heraus öffnen, was den Zugriff auf deine Quelldokumente erleichtert.
+  :config
+  (setq bibtex-autokey-year-length 4
+        bibtex-autokey-name-year-separator "-"
+        bibtex-autokey-year-title-separator "-"
+        bibtex-autokey-titleword-separator "-"
+        bibtex-autokey-titlewords 2
+        bibtex-autokey-titlewords-stretch 1
+        bibtex-autokey-titleword-length 5
+	  org-ref-completion-library 'org-ref-ivy-cite))
+
+(use-package ivy-bibtex
+  :after (org-ref)
+  :config
+  ;; Pfad zu Ihrem PDF-Verzeichnis für ivy-bibtex
+  (setq bibtex-completion-library-path "/home/flowmis/cloud/life/raum/pkb/literatur/"
+        bibtex-completion-bibliography "/home/flowmis/cloud/life/raum/pkb/literatur/20240214T175059==mh--literatur-sammlung__pkb.bib"
+        bibtex-completion-notes-path "/home/flowmis/cloud/life/raum/pkb/literatur/20240214T132208==mh--notizen-literatur__h_pkb_w.org"))
+
+(defun mane-export-to-pdf-and-clean ()
+  "Exportiert an Ort und Stelle, dass auch die Biber Dateien genutzt werden können und verschiebt dann in den Exportordner. Mit dieser Funktion muss kein Pfad mehr angegeben werden (#+export_file_name: blabla.pdf <- ohne Pfad reicht nun) und zudem werden unnötige Dateien vor Ort direkt nach dem Export gelöscht."
+  (interactive)
+  ;; Lokale Einstellungen für org-latex-pdf-process
+  (let* ((org-latex-pdf-process 
+	  '("pdflatex -interaction nonstopmode -output-directory %o %f" 
+            "biber %b" 
+            "pdflatex -interaction nonstopmode -output-directory %o %f" 
+            "pdflatex -interaction nonstopmode -output-directory %o %f"))
+         (org-file (buffer-file-name))
+         (export-file-name (org-export-output-file-name ".pdf" nil))
+         (pdf-file (if (file-name-directory export-file-name)
+                       export-file-name
+                     (concat (file-name-directory org-file) export-file-name)))
+         ;; Zielverzeichnis für die PDF-Datei
+         (destination-dir "/home/flowmis/cloud/life/zeit/void/export/")
+         (destination-pdf (concat destination-dir (file-name-nondirectory pdf-file))))
+    ;; Exportieren zu PDF mit den lokalen Einstellungen
+    (org-latex-export-to-pdf)
+    ;; PDF-Datei verschieben
+    (when (file-exists-p pdf-file)
+      (rename-file pdf-file destination-pdf t)
+      (message "PDF moved to %s" destination-dir))
+    ;; Bereinigung durchführen
+    (let* ((directory (file-name-directory org-file))
+           (extensions '(".aux" ".log" ".nav" ".out" ".snm" ".toc" ".vrb" ".bbl" ".blg" ".fdb_latexmk" ".fls" ".lof" ".lot" ".tex"))
+           (files-to-delete (mapcan (lambda (ext) (directory-files directory t (concat ".*" (regexp-quote ext) "$"))) extensions)))
+      (when files-to-delete
+        (dolist (file files-to-delete)
+          (delete-file file))
+        (message "Cleaned up LaTeX build files."))
+      (unless files-to-delete
+        (message "No LaTeX build files to clean up.")))
+    ;; Zurück zur Org-Datei wechseln
+    (find-file org-file)))
+
+#+end_src
+* TODO Tramp
+Komplette Einrichtung noch machen, wobei es eigentlich bereits integriert ist. Muss halt mal schauen ob es klappt!
+* TESTING
+#+begin_src elisp
+#+end_src
+
+
+
+
+
+

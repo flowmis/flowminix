@@ -26,7 +26,6 @@
   boot.loader.grub = {
     enable = true;
     device = "nodev";
-    useOSProber = true;
   };
   boot.kernelParams = [ "console=tty1" ];
   networking.hostName = "nixos"; 
